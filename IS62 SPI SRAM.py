@@ -32,8 +32,8 @@ MODE_BYTE = 0b00000000
 MODE_PAGE = 0b10000000
 MODE_SEQU = 0b01000000
 
-# Set MAX ADDRESS (256KBits -> 259,999 + 1, 0-based.) 
-MAX_ADDRESS = 255999
+# Set MAX ADDRESS. 8192 pages of 32 bytes means the max byte address is... 262144-1 = 262143!
+MAX_ADDRESS = 262143
         
 # Set the system to either BYTE, PAGE, or SEQUENTIAL mode
 def set_mode(mode):
