@@ -92,7 +92,10 @@ def write_byte(address, data_byte):
     
     # Write
     cs(0)
-    spi.write(bytearray([SWREN, SWRIT, 0b0000000 | address >> 16, address >> 8, address, data_byte]))
+    spi.write(bytearray([SWREN]))
+    cs(1)
+    cs(0)
+    spi.write(bytearray([SWRIT, 0b0000000 | address >> 16, address >> 8, address, data_byte]))
     cs(1)
     cs(0)
     spi.write(bytearray([SWRDI])) # write disable command 
@@ -106,8 +109,11 @@ def write_page(page, data):
     
     # Write
     cs(0)
+    spi.write(bytearray([SWREN]))
+    cs(1)
+    cs(0)
     address = page*128 - 1
-    spi.write(bytearray([SWREN,SWRIT, 0b0000000 | address >> 16, address >> 8, address]) + data)
+    spi.write(bytearray([SWRIT, 0b0000000 | address >> 16, address >> 8, address]) + data)
     cs(1)
     cs(0)
     spi.write(bytearray([SWRDI])) # write disable command 
@@ -133,5 +139,3 @@ def read_status_register():
     cs(1)
     
 read_status_register()
-
-
