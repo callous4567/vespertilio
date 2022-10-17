@@ -29,7 +29,7 @@ cs = machine.Pin(gpio_css, machine.Pin.OUT)
 spi = machine.SPI(which_hardware,
                   baudrate=baudrate,
                   polarity=1,
-                  phase=1,
+                  phase=0,
                   bits=8,
                   firstbit=machine.SPI.MSB,
                   sck=machine.Pin(gpio_sck),
@@ -51,13 +51,13 @@ The status register of the 48LM01 has 8 bits! (It's a standard byte.) Just give 
 
 By default, we should set the register byte to...
 
-0b01000010
+0b01000000
 
 """
 
 # Instructions (8-bit) for standard read/write. Note that the mode is automatically sequential: keep sending data, it'll keep writing it. To stop, pull CS high + send SWRDI.
-SREAD = 0b00000010
-SWRIT = 0b00000011
+SREAD = 0b00000011
+SWRIT = 0b00000010
 
 # Instructions (8-bit) for status register management 
 RMREG = 0b00000101
