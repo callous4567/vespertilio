@@ -89,13 +89,14 @@ static void write_byte(int address, uint8_t byte) {
     cs_select();
     spi_write_blocking(spi1, buf, 1);
     cs_deselect();
-    uint8_t bytebuffer[4];
+    uint8_t bytebuffer[5];
     bytebuffer[0] = WRITE;
     bytebuffer[1] = 0b1111111 | address >> 16;
     bytebuffer[2] = address >> 8;
     bytebuffer[3] = address;
+    bytebuffer[4] = byte;
     cs_select();
-    spi_write_blocking(spi1, bytebuffer, 4);
+    spi_write_blocking(spi1, bytebuffer, 5);
     cs_deselect();
 }
 
@@ -109,7 +110,7 @@ static uint8_t read_byte(int address) {
     uint8_t databuffer[1];
     cs_select();
     spi_write_blocking(spi1, bytebuffer, 4);
-    spi_read_blocking(spi1, 1, databuffer, 1);
+    spi_read_blocking(spi1, 0, databuffer, 1);
     cs_deselect();
     return databuffer[0];
 }
