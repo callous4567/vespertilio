@@ -84,9 +84,9 @@ static void read_default_register() {
 
 // Write a single byte to a register 
 static void write_byte(int address, uint8_t byte) {
-    cs_select();
     uint8_t buf[1];
     buf[0] = WREN;
+    cs_select();
     spi_write_blocking(spi1, buf, 1);
     cs_deselect();
     uint8_t bytebuffer[4];
@@ -103,7 +103,7 @@ static void write_byte(int address, uint8_t byte) {
 static uint8_t read_byte(int address) {
     uint8_t bytebuffer[4];
     bytebuffer[0] = READ;
-    bytebuffer[1] = 0b1111111 | address >> 16;
+    bytebuffer[1] = 0b1111111 | (address >> 16);
     bytebuffer[2] = address >> 8;
     bytebuffer[3] = address; 
     uint8_t databuffer[1];
@@ -127,7 +127,7 @@ int main() {
 
     // Initialize our SPI bus 
     spi_init(spi1, BAUDRATE);
-    spi_set_format(spi1, 8, SPI_CPOL_1, SPI_CPHA_0, SPI_MSB_FIRST);
+    spi_set_format(spi1, 8, SPI_CPOL_1, SPI_CPHA_1, SPI_MSB_FIRST);
 
     // Setup pins 
     gpio_init(SPI_CSN_PIN);
