@@ -4,6 +4,8 @@ Here you'll find the datasheet and the Micropython and C/C++ drivers for the IS6
 The Micropython driver is fairly rudimentary but it should serve as a good way to get started with interfacing with the SRAM- my first
 attempt with anything Pi Pico related so... yeah. 
 
+![alt text](https://github.com/callous4567/Batcorder/blob/main/IS62%20SPI%20SRAM%20Driver/Circuit.PNG)
+
 ## Circuit.png 
 Example circuit diagram. Decoupling caps are included including a ferrite to isolate from the 3V3 noise on the Pico.
 
