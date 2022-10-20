@@ -7,6 +7,9 @@ attempt with anything Pi Pico related so... yeah.
 ## Circuit.png 
 Example circuit diagram. Decoupling caps are included including a ferrite to isolate from the 3V3 noise on the Pico.
 
+## Datasheet.png
+The datasheet for the SRAM model I am using, taken from the Mouser/Digi-key catalogue.
+
 ## IS62_DRIVER.py 
 Micropython (basically pseudo)-code. Works well enough- copy from the C code if you need more.
 
