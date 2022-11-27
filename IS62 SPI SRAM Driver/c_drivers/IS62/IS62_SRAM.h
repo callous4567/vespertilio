@@ -7,7 +7,14 @@
 #include <stdio.h>
 #include <string.h>
 
-// Set the relevant pins for the SRAM unit 
+/*
+Some quick notes:
+- I have not included any error catches: if you fuck up by calling an address that does not exist on the SRAM, overwriting it, etc, that isn't my problem.
+- I am very new to C/C++- in fact this is my first C/C++ project. This code works- I have not checked if the types or anything are right though. I am a Python man, learning C.
+- Make an "Issue" if there is something you are not sure about and I will try to help. Again though- I am a Python man, not a C man. 
+*/
+
+// Some default values. The struct is there to make it more general for multiple SRAM or etc. 
 const int SRAM_SPI_RX_PIN = 12;// Yellow 
 const int SRAM_SPI_CS_PIN = 13; // White 
 const int SRAM_SPI_SCK_PIN = 14; // Blue
@@ -133,5 +140,19 @@ TODO: Return a true-false if successful.
 At the moment, prints to UART.
 */
 void SRAM_DMA_TEST(sram_t *SRAM); 
+
+// Write bufflen from *buff starting at address in the SRAM... 8-bit data
+void SRAM_start_sequential_write_buffer(sram_t *SRAM, int address, uint8_t *buff, int bufflen);
+
+// Write bufflen from *buff starting at address in the SRAM... 16-bit data 
+void SRAM_start_sequential_write16_buffer(sram_t *SRAM, int address, uint16_t *buff, int bufflen);
+
+// Read bufflen to *buff starting at address in the SRAM... 8-bit data
+void SRAM_start_sequential_read_buffer(sram_t *SRAM, int address, uint8_t *buff, int bufflen);
+
+// Read bufflen to *buff starting at address in the SRAM... 16-bit data 
+void SRAM_start_sequential_read16_buffer(sram_t *SRAM, int address, uint16_t *buff, int bufflen);
+
+
 
 #endif /* IS62_SRAM_H */

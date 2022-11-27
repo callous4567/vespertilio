@@ -12,8 +12,6 @@
 #include "IS62_SRAM.h"
 #include "../Utilities/utils.h"
 
-spi_inst_t *SRAM_SPI = spi1;
-
 // Activate the CS pin (pull low)
 void SRAM_select(sram_t *SRAM) { /* declaration: https://stackoverflow.com/questions/21835664/why-declare-a-c-function-as-static-
     declaring static means other modules do not see it: it's local to this module and saves effort
@@ -90,7 +88,14 @@ void SRAM_SPI16(sram_t *SRAM) {
     spi_set_format(SRAM->hw_inst, 16, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
 }
 
-// Start sequentials. Note that you need to call SRAM_SPI8(SRAM) at the end of any 16-bit process for future commands (8 bit) to work. When in 16-bit, you have half of SRAM_MAXBYTE/PAGE for indices. 
+/*
+Start sequential write-reads.
+Standard process:
+- call SRAM_start 
+- spi_write/read_blocking
+- call SRAM_deselect
+If you are using the read16 or write16 functionality, you also need to call SRAM_SPI8 after deselecting, or else commands will not work later.
+*/
 void SRAM_start_sequential_read(sram_t *SRAM, int address) {
     uint8_t buf[4];
     buf[0] = SRAM_READ;
@@ -359,4 +364,38 @@ void SRAM_DMA_TEST(sram_t *SRAM) {
     }
 
     printf("Successfully ran SRAM_DMA_TEST test without any errors. Proceeding.");
+}
+
+// Write from the provided buffer to the SRAM, starting at a given address, the 8-bit uint8_t buffer, of length bufflen
+void SRAM_start_sequential_write_buffer(sram_t *SRAM, int address, uint8_t *buff, int bufflen) {
+    SRAM_sequential_mode(SRAM);
+    SRAM_start_sequential_write(SRAM, address);
+    spi_write_blocking(SRAM->hw_inst, buff, bufflen);
+    SRAM_deselect(SRAM);
+}
+
+// Write from the provided buffer to the SRAM, starting at a given address, the 16-bit uint16_t buffer, of length bufflen
+void SRAM_start_sequential_write16_buffer(sram_t *SRAM, int address, uint16_t *buff, int bufflen) {
+    SRAM_sequential_mode(SRAM);
+    SRAM_start_sequential_write16(SRAM, address);
+    spi_write16_blocking(SRAM->hw_inst, buff, bufflen);
+    SRAM_deselect(SRAM);
+    SRAM_SPI8(SRAM);
+}
+
+// Read from the SRAM to the buffer, starting at a given address, the 8-bit uint8_t buffer, of length bufflen 
+void SRAM_start_sequential_read_buffer(sram_t *SRAM, int address, uint8_t *buff, int bufflen) {
+    SRAM_sequential_mode(SRAM);
+    SRAM_start_sequential_read(SRAM, address);
+    spi_read_blocking(SRAM->hw_inst, 0x00, buff, bufflen);
+    SRAM_deselect(SRAM);
+}
+
+// Read from the SRAM to the buffer, starting at a given address, the 16-bit uint16_t buffer, of length bufflen
+void SRAM_start_sequential_read16_buffer(sram_t *SRAM, int address, uint16_t *buff, int bufflen) {
+    SRAM_sequential_mode(SRAM);
+    SRAM_start_sequential_read16(SRAM, address);
+    spi_read16_blocking(SRAM->hw_inst, 0x00, buff, bufflen);
+    SRAM_deselect(SRAM);
+    SRAM_SPI8(SRAM);
 }
