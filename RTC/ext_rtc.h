@@ -15,8 +15,8 @@ typedef struct {
     i2c_inst_t *hw_inst; 
     int baudrate; 
 
-    // Time keeping. MALLOC OBJECT!
-    uint8_t *timebuf; // 7 entries uint8_t top-down see ext_rtc.c
+    // Time keeping. MALLOC OBJECT! Note that this is in int format (not BCD.)
+    uint8_t *timebuf; // 7 entries uint8_t top-down see ext_rtc.c. 
 
 } ext_rtc_t;
 
@@ -35,6 +35,13 @@ void rtc_register_write(
     uint8_t *data,
     uint8_t len
 );
+
+// convert uint8_t to BCD uint8_t 
+uint8_t toBCD(uint8_t a);
+
+// convert uint8_t int from BCD 
+uint8_t fromBCD(uint8_t a);
+
 
 // return the pointer to a malloc'd RTC default based on our config.
 ext_rtc_t* init_RTC_default(void);

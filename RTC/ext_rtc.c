@@ -30,6 +30,142 @@ static void toBinary(uint8_t a) {
     printf("\r\n");
 }
 
+// Print as binary the individual 16-bit byte a 
+static void toBinary_16(uint16_t a) {
+
+    for (int i = 0; i < 16; i++) {
+        printf("%d", (a & 0x8000) >> 15);
+        a <<= 1;
+    }
+    printf("\r\n");
+}
+
+// convert a 4-bit nibble (inside a uint8_t right bits) to BCD representation 
+static uint8_t toBCD_sub(uint8_t a) {
+    switch(a) {
+
+        case 0  :
+            return 0x00;
+            break;
+        
+        case 1  :
+            return 0b00000001;
+            break;
+        
+        case 2  : 
+            return 0b00000010;
+            break;
+
+        case 3  :
+            return 0b00000011;
+            break;
+        
+        case 4  :
+            return 0b00000100;
+            break;
+        
+        case 5  :
+            return 0b00000101;
+            break;
+
+        case 6  :
+            return 0b00000110;
+            break;
+
+        case 7  :
+            return 0b00000111;
+            break;
+
+        case 8  :
+            return 0b00001000;
+            break;
+
+        case 9  :
+            return 0b00001001;
+            break;
+
+        default:
+            panic("BCD lookup failed. Is your value under 10 or not?");
+            break;
+
+    }
+
+}
+
+// convert a full 8-bit of two nibbles into packed BCD 
+uint8_t toBCD(uint8_t a) {
+
+    return (toBCD_sub(a/10)<<4) | toBCD_sub(a%10);
+}
+
+// the reverse (BCD to int!) but sub 
+static uint8_t fromBCD_sub(uint8_t a) {
+
+    switch(a) {
+
+        case 0x00  :
+            return 0;
+            break;
+        
+        case 0b00000001  :
+            return 1;
+            break;
+        
+        case 0b00000010  : 
+            return 2;
+            break;
+
+        case 0b00000011  :
+            return 3;
+            break;
+        
+        case 0b00000100  :
+            return 4;
+            break;
+        
+        case 0b00000101  :
+            return 5;
+            break;
+
+        case 0b00000110  :
+            return 6;
+            break;
+
+        case 0b00000111  :
+            return 7;
+            break;
+
+        case 0b00001000  :
+            return 8;
+            break;
+
+        case 0b00001001  :
+            return 9;
+            break;
+
+        default:
+            panic("BCD lookup failed. Is your value under 10 or not?");
+            break;
+
+    }
+
+
+}
+
+// convert a packed 2-BCD BCD to uint8_t 
+uint8_t fromBCD(volatile uint8_t a) {
+    uint8_t result;
+    result = 10*fromBCD_sub(a>>4);
+    result += fromBCD_sub(a & 0b00001111);
+    return result;
+}
+
+
+// convert binary-coded-decimal with two digits to standard uint8_t 
+static inline uint8_t touint8(uint8_t a) {
+    return a;
+}
+
 // Initialize the RTC object default. Returns it. MALLOC!!!!
 ext_rtc_t* init_RTC_default(void) {
 
@@ -89,6 +225,16 @@ ext_rtc_t* init_RTC_default(void) {
         1
     );
 
+    // Set some example times on the timebuf just for the sake of giving us some filenames/etc to work with. 
+    /*
+    *EXT_RTC->timebuf = 0;
+    *(EXT_RTC->timebuf+1) = 59;
+    *(EXT_RTC->timebuf+2) = 22;
+    *(EXT_RTC->timebuf+4) = 8;
+    *(EXT_RTC->timebuf+5) = 12;
+    *(EXT_RTC->timebuf+6) = 22;
+    rtc_set_current_time(EXT_RTC);
+    */
 
     // return the malloc'd pointer :)
     return EXT_RTC;
@@ -175,6 +321,15 @@ void rtc_set_current_time(
     ext_rtc_t *EXT_RTC
 ) {
     
+    // first convert our standard int time to BCD time
+    *EXT_RTC->timebuf = toBCD(*EXT_RTC->timebuf);
+    *(EXT_RTC->timebuf+1) = toBCD(*(EXT_RTC->timebuf+1));
+    *(EXT_RTC->timebuf+2) = toBCD(*(EXT_RTC->timebuf+2));
+    *(EXT_RTC->timebuf+3) = toBCD(*(EXT_RTC->timebuf+2));
+    *(EXT_RTC->timebuf+4) = toBCD(*(EXT_RTC->timebuf+4));
+    *(EXT_RTC->timebuf+5) = toBCD(*(EXT_RTC->timebuf+5));
+    *(EXT_RTC->timebuf+6) = toBCD(*(EXT_RTC->timebuf+6));
+
     rtc_register_write(
         EXT_RTC,
         RTC_SECONDS,
@@ -267,6 +422,16 @@ void rtc_read_time(
         EXT_RTC->timebuf+6,
         1
     );
+
+    // convert all our read values from BCD to standard int
+    *EXT_RTC->timebuf = fromBCD(*EXT_RTC->timebuf);
+    *(EXT_RTC->timebuf+1) = fromBCD(*(EXT_RTC->timebuf+1));
+    *(EXT_RTC->timebuf+2) = fromBCD(*(EXT_RTC->timebuf+2));
+    *(EXT_RTC->timebuf+3) = fromBCD(*(EXT_RTC->timebuf+2));
+    *(EXT_RTC->timebuf+4) = fromBCD(*(EXT_RTC->timebuf+4));
+    *(EXT_RTC->timebuf+5) = fromBCD(*(EXT_RTC->timebuf+5));
+    *(EXT_RTC->timebuf+6) = fromBCD(*(EXT_RTC->timebuf+6));
+
 
 }
 
