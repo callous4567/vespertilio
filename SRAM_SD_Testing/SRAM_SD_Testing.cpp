@@ -16,6 +16,9 @@ extern "C" {
 extern "C" {
 #include "drivers/mSD/mSD.h"
 }
+extern "C" {
+#include "drivers/ext_rtc/ext_rtc.h"
+}
 #include "malloc.h"
 #include "hardware/spi.h"
 #include "hardware/clocks.h"
@@ -297,8 +300,10 @@ int main() {
     
 
     stdio_init_all();
-    time_init();
-    test_cycle();
+    ext_rtc_t* EXT_RTC = rtc_debug();
+    rtc_sleep_until_alarm(EXT_RTC);
+    //time_init();
+    //test_cycle();
     //SD_ADC_DMA_testwrite();
     printf("All done! Bye bye!"); 
 

@@ -4,6 +4,9 @@ cmake_minimum_required(VERSION 3.12)
 # Include build functions from Pico SDK
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 
+# and pico extras 
+include($ENV{PICO_EXTRAS_PATH}/external/pico_extras_import.cmake)
+
 # Creates a pico-sdk subdirectory in our project for the libraries
 pico_sdk_init()
 
@@ -21,6 +24,8 @@ add_executable(${PROJECT_NAME}
     drivers/Utilities/utils.c
     drivers/mSD/mSD.c
     drivers/mSD/hw_config.c
+    drivers/ext_rtc/ext_rtc_registers.c 
+    drivers/ext_rtc/ext_rtc.c 
 )
 
 # Create map/bin/hex/uf2 files
@@ -38,6 +43,11 @@ target_link_libraries(${PROJECT_NAME}
     hardware_rtc
     hardware_dma
     FatFs_SPI
+    hardware_i2c
+    hardware_sleep
+    hardware_rosc
+    pico_runtime
+    pico_stdio_usb
 )
 
 # Enable usb output, disable uart output
