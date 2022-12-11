@@ -1,6 +1,3 @@
-# Batcorder
+# Batcorder, now named "vespertilio"
 
-The effort making a bat-recording device in C/C++! Never worked with it before, here it goes! I'll upload all my drivers here, including circuit diagrams and all the other stuff
-that I will procedurally work through. 
-
-Status at the moment: coding everything for the SRAM/SD interface! 
+Aye- Latin for bat! Or bats- I have no clue. Witness as I chronicle all my efforts into making a Pi Pico-based bat recorder that tries to tap out the 500 kHz of the ADC on the Pico, paired with pressure-temperature-humidity sensing by the BME280! I plan to slap an external ADC on to get full 16-bit resolution, but that's beyond the point! :D 
