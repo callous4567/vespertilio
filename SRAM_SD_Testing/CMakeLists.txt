@@ -20,12 +20,19 @@ set(CMAKE_CXX_STANDARD 17)
 # Tell CMake where to find the executable source file
 add_executable(${PROJECT_NAME} 
     SRAM_SD_Testing.cpp
-    drivers/SRAM/IS62_SRAM.c
     drivers/Utilities/utils.c
     drivers/mSD/mSD.c
     drivers/mSD/hw_config.c
     drivers/ext_rtc/ext_rtc_registers.c 
     drivers/ext_rtc/ext_rtc.c 
+    drivers/recording/recording.c
+    drivers/mcp4131_digipot/mcp4131_registers.c
+    drivers/mcp4131_digipot/spi_driver.c
+    drivers/bme280/bme280_spi.c
+    drivers/pico_usb_configure/pico_flash_registers.c 
+    drivers/pico_usb_configure/pico_flash.c 
+    drivers/pico_usb_configure/vespertilio_usb_int.c
+    drivers/Utilities/external_config.c 
 )
 
 # Create map/bin/hex/uf2 files
@@ -48,11 +55,13 @@ target_link_libraries(${PROJECT_NAME}
     hardware_rosc
     pico_runtime
     pico_stdio_usb
+    hardware_flash
+    hardware_sync
 )
 
-# Enable usb output, disable uart output
-pico_enable_stdio_usb(${PROJECT_NAME} 0)
-pico_enable_stdio_uart(${PROJECT_NAME} 1)
+# Enable UART and USB
+pico_enable_stdio_usb(${PROJECT_NAME} 1)
+pico_enable_stdio_uart(${PROJECT_NAME} 0)
 
 # COMMAND TO MAKE/BUILD/ETC the Cmake files 
 # cmake -G "MinGW Makefiles" .. 

@@ -33,12 +33,12 @@
 /  2: Enable with LF-CRLF conversion. */
 
 
-#define FF_USE_FIND		1
+#define FF_USE_FIND		0
 /* This option switches filtered directory read functions, f_findfirst() and
 /  f_findnext(). (0:Disable, 1:Enable 2:Enable with matching altname[] too) */
 
 
-#define FF_USE_MKFS		1
+#define FF_USE_MKFS		0
 /* This option switches f_mkfs() function. (0:Disable or 1:Enable) */
 
 
@@ -150,7 +150,7 @@
 */
 
 
-#define FF_FS_RPATH		2
+#define FF_FS_RPATH		0
 /* This option configures support for relative path.
 /
 /   0: Disable relative path and remove related functions.
@@ -163,7 +163,7 @@
 / Drive/Volume Configurations
 /---------------------------------------------------------------------------*/
 
-# define FF_VOLUMES		2
+# define FF_VOLUMES		1
 /* Number of volumes (logical drives) to be used. (1-10) */
 
 
@@ -259,8 +259,8 @@
 /  bit1=1: Do not trust last allocated cluster number in the FSINFO.
 */
 
-
-#define FF_FS_LOCK		16
+// set to 2 (environmental data file + audio data file.)
+#define FF_FS_LOCK		2
 /* The option FF_FS_LOCK switches file lock function to control duplicated file open
 /  and illegal operation to open objects. This option must be 0 when FF_FS_READONLY
 /  is 1.

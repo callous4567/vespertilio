@@ -4,23 +4,32 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include "f_util.h"
+#include "ff.h"
+#include "pico/stdlib.h"
+#include "hw_config.h"
 
-// All the SRAM parameters for the SD CARD for the hardware configuration. We will manually handle the card detect ourselves.  
-const int SD_ENABLE = 20; // for mosfet 
-const bool SD_CD_USEORNOT = false; // use the CD or not 
-const int SD_CD = 21; // for card detect gpio 
-const int SD_CD_VALUE = 0; // what is read if card present
+// struct to contain all mSD variables applicable for us to use (that may change.) All malloc'd except for the sd_card_t object. 
+typedef struct {
 
-// Configure all the pins for the SD 
-void SD_pin_configure(void);
+    // the SD card object. NOT IN MALLOC.
+    sd_card_t *pSD;
 
-// Turn mosfet on for SD
-void SD_ON(void);
+    // file object structures for audio file + environment file 
+    FIL *fp_audio;
+    FIL *fp_env;
 
-// Turn mosfet off for SD
-void SD_OFF(void);
+    // bytes written 
+    UINT *bw;
+    UINT *bw_env;
 
-// Check if file exists on SD 
+    // filenames of the two files for data recording (the audio file and the environmental data file)
+    char *fp_audio_filename;
+    char *fp_env_filename;
+
+} mSD_struct_t; 
+
+// Check if file exists on SD (returns a bool true/false) 
 bool SD_IS_EXIST(const char *test_filename);
 
 // Do the major gineral test write-read 

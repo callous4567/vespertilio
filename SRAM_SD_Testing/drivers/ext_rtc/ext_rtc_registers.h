@@ -1,3 +1,6 @@
+#ifndef EXT_RTC_REGS
+#define EXT_RTC_REGS
+
 #include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -35,3 +38,5 @@ RTC_ALARM_2_DAYDATES,
 RTC_CONTROL,
 RTC_STATUS,
 RTC_TRICKLE;
+
+#endif /* EXT_RTC_REGS */

@@ -1,0 +1,5 @@
+Circuit: * C:\Users\Callicious\Documents\Prog\pycharm\EvaBatProject\Schematics\KiCad Schemas\ECH8654-SPICE-D.rev1\Draft1.asc
+
+Error on line 2 : v1 nc_01 nc_02 v
+	 Unknown parameter "v"
+Fatal Error: No analysis request found.

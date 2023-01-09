@@ -1,0 +1,48 @@
+********************** ECH8654 SPICE PARAMETER *************************
+.LIB ECH8654                                                                  
+* DATE : 2007/10/29                                                           
+* Temp = 27 deg                                                               
+* W    =  1494310 E-6 m                                                       
+* L    =      1.0 E-6 m                                                       
+* AD   =  1494310 E-12 m2                                                     
+* RG   =       15 ohm                                                         
+* RB   =    0.013 ohm                                                         
+                                                                              
+.MODEL ECH8654 PMOS (                                LEVEL    = 8             
++VERSION  = 3.2            TNOM     = 27             TOX      = 2.7E-08       
++VTH0     = -0.91          K1       = 1.96           K2       = -0.04         
++NLX      = 3.20E-07       DVT0     = 1.12           DVT1     = 0.22          
++DVT2     = -0.01          U0       = 300            UA       = 1.10E-10      
++UB       = 1.00E-21       VSAT     = 1.86E04        A0       = 0.44          
++AGS      = 1.00           A1       = 0              A2       = 1             
++RDSW     = 2.96E03        PRWG     = -0.011         WR       = 0.83          
++WINT     = 0              LINT     = 2.09E-09       VOFF     = -0.10         
++NFACTOR  = 1.118          CIT      = 0              CDSC     = 2.40E-04      
++CDSCD    = 0              ETA0     = 0.08           DSUB     = 0.96          
++PCLM     = 1.40           PDIBLC1  = 0.05           PDIBLC2  = 6.50E-03      
++DROUT    = 0.96           PSCBE1   = 1.40E09        PSCBE2   = 1.00E-05      
++PVAG     = 0.01           DELTA    = 0.10           NGATE    = 1.0E19        
++MOBMOD   = 1              NQSMOD   = 0              NOIMOD   = 1             
++CAPMOD   = 3              XPART    = 0.5            CGSO     = 9.00E-11      
++CGDO     = 1.50E-11       CGBO     = 0              CGSL     = 0             
++CGDL     = 3.90E-10       CKAPPA   = 1.20           CF       = 0             
++CLC      = 3.0E-09        CLE      = 0.8            DWC      = 0             
++DLC      = 1.90E-07       NOFF     = 3.66           VOFFCV   = -0.40         
++ACDE     = 1.0            MOIN     = 15             CJ       = 2.20E-04      
++MJ       = 0.60           PB       = 0.41           JS       = 1.50E-07      
++NJ       = 1.00           XTI      = 3.0            IJTH     = 0             
++KT1      = -0.45          UTE      = -0.3           PRT      = 5.00E03       
++AT       = 2.5E04         )                                                  
+*                                                                             
+.ENDL ECH8654                                                                 
+                                                                              
+*  Device Expression Example                                                  
+*    Electrode = Drain Gate Source                                            
+*    Mxxx Drain Gin Source Body ECH8654 W=1494310E-6 L=1.0E-6 AD=1494310E-12  
+*    RG Gate Gin 15                                                           
+*    RB Body Source 0.013                                                     
+                                                                              
+*  Information herein is for example only;                                    
+*  it is not guaranteed for volume production.                                
+                                                                              
+* ON Semiconductor      

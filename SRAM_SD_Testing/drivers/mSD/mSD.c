@@ -1,29 +1,4 @@
-#include <stdio.h>
-#include <stdbool.h>
-#include <string.h>
-#include "f_util.h"
-#include "ff.h"
-#include "pico/stdlib.h"
-#include "hw_config.h"
 #include "mSD.h"
-
-// Configure pins for the MicroSD 
-void SD_pin_configure(void) {
-    gpio_init(SD_ENABLE);
-    gpio_set_dir(SD_ENABLE, true);
-    gpio_init(SD_CD);
-    gpio_set_dir(SD_CD, false);
-    gpio_set_drive_strength(SD_ENABLE, GPIO_DRIVE_STRENGTH_2MA); // mosfet 
-    gpio_set_drive_strength(SD_CD, GPIO_DRIVE_STRENGTH_2MA); // card detect 
-}
-
-// Toggle the MOSFET for the MicroSD 
-void SD_ON(void) {
-    gpio_put(SD_ENABLE, false);
-}
-void SD_OFF(void) {
-    gpio_put(SD_ENABLE, true);
-}
 
 // Stolen from no-OS-FatFS- check if the test_filename exists. 
 bool SD_IS_EXIST(const char *test_filename) {
@@ -50,8 +25,6 @@ bool SD_IS_EXIST(const char *test_filename) {
 void major_gineral_testwrite(void) {
     
     // Configure drive
-    SD_pin_configure();
-    SD_ON();
     sleep_ms(1000);
 
     // See FatFs - Generic FAT Filesystem Module, "Application Interface",
@@ -153,3 +126,4 @@ void major_gineral_testwrite(void) {
     for (;;);
 
 }
+

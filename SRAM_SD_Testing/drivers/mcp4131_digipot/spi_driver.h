@@ -1,0 +1,60 @@
+#ifndef MCP4131_SPI
+#define MCP4131_SPI
+
+#include "mcp4131_registers.h"
+
+#include <stdio.h>
+#include <string.h>
+#include <stdbool.h>
+#include "pico/stdlib.h"
+#include "pico/binary_info.h"
+#include "hardware/gpio.h"
+#include "malloc.h"
+#include "pico/time.h"
+#include "../Utilities/utils.h"
+
+typedef struct {
+
+    // Pins
+    int32_t SCK_PIN;
+    int32_t MOSI_PIN;
+    int32_t CSN_1;
+    int32_t CSN_2;
+    int32_t MISO_PIN;
+    
+    // SPI
+    spi_inst_t *hw_inst; 
+    int32_t baudrate; 
+
+    // Taps values (to set, or read.)
+    int32_t TAP_1;
+    int32_t TAP_2;
+
+    // Gains (individual + total.)
+    int32_t GAIN_1;
+    int32_t GAIN_2;
+    int32_t GAIN; 
+
+} dpot_dual_t; // THIS IS MALLOC'D!!!
+
+
+// grab the DPOT object necessary to control gain of our cascade 
+dpot_dual_t* init_dpot(void);
+
+// deinit the dpot 
+void deinit_dpot(dpot_dual_t* DPOT);
+
+// read the value of the tap to the DPOT 
+void dpot_read_tap(dpot_dual_t* DPOT, int32_t which);
+
+// write the value to the tap
+void dpot_write_tap(dpot_dual_t* DPOT, int32_t which, int32_t value);
+
+// get status register of given DPOT 
+void dpot_read_status(dpot_dual_t* DPOT, int32_t which);
+
+// set the gain on the dpot cascade stage 
+void dpot_set_gain(dpot_dual_t* DPOT, int32_t which, int32_t gain);
+
+#endif // MCP4131_SPI
+

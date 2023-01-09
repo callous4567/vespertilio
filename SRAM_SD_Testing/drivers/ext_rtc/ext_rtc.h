@@ -3,6 +3,18 @@
 #define EXT_RTC_H
 
 #include "ext_rtc_registers.h"
+#include <stdio.h>
+#include <string.h>
+#include "pico/stdlib.h"
+#include "pico/binary_info.h"
+#include "hardware/gpio.h"
+#include "malloc.h"
+#include "pico/time.h"
+#include "pico/sleep.h"
+#include "hardware/rosc.h"
+#include "hardware/structs/scb.h"
+#include "hardware/clocks.h"
+#include "../Utilities/utils.h"
 
 typedef struct {
 
@@ -20,6 +32,9 @@ typedef struct {
 
     // Alarm keeping. MALLOC OBJECT! Note that this is in int format (not BCD.)
     uint8_t *alarmbuf; // 4 entries- see datasheet. 
+
+    // A string of the current time
+    char* fullstring;
 
 } ext_rtc_t;
 
@@ -55,7 +70,7 @@ void rtc_set_current_time(ext_rtc_t *EXT_RTC);
 void rtc_read_time(ext_rtc_t *EXT_RTC);
 
 // get time formatted as a string instead. MALLOC MUST FREE LATER!
-char* rtc_read_string_time(ext_rtc_t *EXT_RTC); 
+void rtc_read_string_time(ext_rtc_t *EXT_RTC); 
 
 // set time for alarm1 from alarmbuf 
 void rtc_set_alarm1(ext_rtc_t *EXT_RTC);

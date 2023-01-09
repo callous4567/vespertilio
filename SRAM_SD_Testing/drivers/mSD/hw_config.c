@@ -29,25 +29,28 @@ socket, which SPI it is driven by, and how it is wired.
 //
 #include "diskio.h" /* Declarations of disk functions */
 
-void spi0_dma_isr();
+void spi1_dma_isr();
 
 // All the SRAM parameters for the SD CARD for the hardware configuration. You will need to manually copy these over to hw_config.c sadly. 
-static const int SD_SPI_RX_PIN = 16;// Yellow 
-static const int SD_SPI_CSN_PIN = 17; // White 
-static const int SD_SPI_SCK_PIN = 18; // Blue
-static const int SD_SPI_TX_PIN =  19; // Green 
+static const int SD_SPI_RX_PIN = 12;// Yellow 
+static const int SD_SPI_CSN_PIN = 13; // White 
+static const int SD_SPI_SCK_PIN = 14; // Blue
+static const int SD_SPI_TX_PIN =  15; // Green 
 static const int SD_BAUDRATE = 25*1000*1000; // baudrate 
 
 // The hardware configuration for the SD card we're using. 
 static spi_t spis[] = {  // One for each SPI.
     {
 
-        .hw_inst = spi0,  
+        .hw_inst = spi1,  
         .miso_gpio = SD_SPI_RX_PIN, 
         .mosi_gpio = SD_SPI_TX_PIN, 
         .sck_gpio = SD_SPI_SCK_PIN,
         .baud_rate = SD_BAUDRATE,  // The limitation here is SPI slew rate.
-        .dma_isr = spi0_dma_isr
+        .dma_isr = spi1_dma_isr,
+        .mosi_gpio_drive_strength = GPIO_DRIVE_STRENGTH_2MA,
+        .sck_gpio_drive_strength = GPIO_DRIVE_STRENGTH_2MA,
+        .set_drive_strength = true,
     }
 };
 
@@ -65,7 +68,7 @@ static sd_card_t sd_cards[] = {  // One for each SD card
     }
 };
 
-void spi0_dma_isr() { spi_irq_handler(&spis[0]); }
+void spi1_dma_isr() { spi_irq_handler(&spis[0]); }
 
 /* ********************************************************************** */
 size_t sd_get_num() { return count_of(sd_cards); }

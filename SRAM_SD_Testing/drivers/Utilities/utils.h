@@ -2,17 +2,15 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-/* Standard includes. */
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
+// See external_config.h for includes + configurated constants. 
+#include "external_config.h"
 
-/*
-This file holds various utilities that don't necessarily fit elsewhere.
-*/
-static const int ADC_PIN = 26;
-static const int ADC_SAMPLE_RATE = 192000;
-static const int ADC_TRANSFER_SIZE = 512; // 256 transfers equals 512 bytes equals 16 pages. 
+// Enable digital assembly or analogue assembly (and disable too)
+void digi_enable(void); 
+void digi_disable(void);
+void ana_enable(void);
+void ana_disable(void);
+void ana_pull_down(void);
 
 // Initialize the ADC taking from default pin
 void setup_adc(void); 

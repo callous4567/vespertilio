@@ -1,34 +1,4 @@
 #include "ext_rtc.h"
-#include <stdio.h>
-#include <string.h>
-#include "pico/stdlib.h"
-#include "pico/binary_info.h"
-#include "hardware/gpio.h"
-#include "malloc.h"
-#include "pico/time.h"
-#include "pico/sleep.h"
-#include "hardware/rosc.h"
-#include "hardware/structs/scb.h"
-#include "hardware/clocks.h"
-
-// Print as binary the individual 8-bit byte a 
-static void toBinary(uint8_t a) {
-    uint8_t i;
-
-    for(i=0x80;i!=0;i>>=1)
-        printf("%c",(a&i)?'1':'0'); 
-    printf("\r\n");
-}
-
-// Print as binary the individual 16-bit byte a 
-static void toBinary_16(uint16_t a) {
-
-    for (int i = 0; i < 16; i++) {
-        printf("%d", (a & 0x8000) >> 15);
-        a <<= 1;
-    }
-    printf("\r\n");
-}
 
 // convert a 4-bit nibble (inside a uint8_t right bits) to BCD representation 
 static uint8_t toBCD_sub(uint8_t a) {
@@ -75,7 +45,7 @@ static uint8_t toBCD_sub(uint8_t a) {
             break;
 
         default:
-            panic("BCD lookup failed. Is your value under 10 or not?");
+            panic("BCD lookup failed. Is your value under 10 or not?, %d", a);
             break;
 
     }
@@ -134,7 +104,7 @@ static uint8_t fromBCD_sub(uint8_t a) {
             break;
 
         default:
-            panic("BCD lookup failed. Is your value under 10 or not?");
+            panic("BCD lookup failed. Is your value under 10 or not?, %d", a);
             break;
 
     }
@@ -177,6 +147,10 @@ ext_rtc_t* init_RTC_default(void) {
     gpio_set_function(EXT_RTC->sda, GPIO_FUNC_I2C);
     gpio_set_function(EXT_RTC->scl, GPIO_FUNC_I2C);
 
+    // disable internal pulls. 
+    gpio_set_pulls(RTC_SDA_PIN, false, false);
+    gpio_set_pulls(RTC_SCK_PIN, false, false);
+
     // malloc up the timebuf too (7 bytes. See datasheet top-down of registers.)
     EXT_RTC->timebuf = (uint8_t*)malloc(7);
 
@@ -199,6 +173,7 @@ ext_rtc_t* init_RTC_default(void) {
     uint8_t *RTC_DEFAULT_CONTROL_ptr = &RTC_DEFAULT_CONTROL;
 
     // write our new register
+    printf("Writing default control register...");
     rtc_register_write(
         EXT_RTC,
         RTC_CONTROL,
@@ -218,6 +193,7 @@ ext_rtc_t* init_RTC_default(void) {
     uint8_t *RTC_DEFAULT_TRICKLE_ptr = &RTC_DEFAULT_CONTROL;
 
     // write trickle register 
+    printf("Writing default trickle...");
     rtc_register_write(
         EXT_RTC,
         RTC_TRICKLE,
@@ -230,11 +206,14 @@ ext_rtc_t* init_RTC_default(void) {
     *EXT_RTC->timebuf = 0;
     *(EXT_RTC->timebuf+1) = 59;
     *(EXT_RTC->timebuf+2) = 22;
-    *(EXT_RTC->timebuf+4) = 8;
+    *(EXT_RTC->timebuf+4) = 13;
     *(EXT_RTC->timebuf+5) = 12;
     *(EXT_RTC->timebuf+6) = 22;
     rtc_set_current_time(EXT_RTC);
     */
+
+    // The internal fullstring too
+    EXT_RTC->fullstring = (char*)malloc(22);
 
     // return the malloc'd pointer :)
     return EXT_RTC;
@@ -472,6 +451,14 @@ void rtc_read_time(
         1
     );
 
+    // Quick debug step
+    /*
+    printf("TIMEBUF DEBUG!!!\r\n");
+    for (int i = 0; i < 7; i++) {
+        toBinary(*(EXT_RTC->timebuf+i));
+    }
+    printf("TIMEBUF DEBUG DONE!");
+    */
     // convert all our read values from BCD to standard int
     *EXT_RTC->timebuf = fromBCD(*EXT_RTC->timebuf);
     *(EXT_RTC->timebuf+1) = fromBCD(*(EXT_RTC->timebuf+1));
@@ -484,26 +471,25 @@ void rtc_read_time(
 
 }
 
-// use malloc for return of string (free later.) 
-char* rtc_read_string_time(ext_rtc_t *EXT_RTC) {
+// read the current time (to the internal malloc string, which is 22 bytes.)
+void rtc_read_string_time(ext_rtc_t *EXT_RTC) {
     /*
     the maximum number of chars/bytes written is...
     2 for second 
     2 for minute
     2 for hour
-    1 for day
+    2 for day
     2 for month
     2 for year 
-    2 per spacer w/ 5 spacers = 21
-    hence 16 bytes 
+    2 per spacer w/ 5 spacers = 22
+    hence 22 bytes 
     */
-    char *fullstring;
-    fullstring = (char*)malloc(21);
+
     
     // USE THIS
     snprintf(
-        fullstring,
-        21,
+        EXT_RTC->fullstring,
+        22,
         "%d_%d_%d_%d_%d_%d", 
         *(EXT_RTC->timebuf),
         *(EXT_RTC->timebuf+1),
@@ -513,37 +499,21 @@ char* rtc_read_string_time(ext_rtc_t *EXT_RTC) {
         *(EXT_RTC->timebuf+6)
     );
 
-    return fullstring;
-
 }
 
-
-static void measure_freqs(void) {
-    uint f_pll_sys = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_PLL_SYS_CLKSRC_PRIMARY);
-    uint f_pll_usb = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_PLL_USB_CLKSRC_PRIMARY);
-    uint f_rosc = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_ROSC_CLKSRC);
-    uint f_clk_sys = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS);
-    uint f_clk_peri = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_PERI);
-    uint f_clk_usb = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_USB);
-    uint f_clk_adc = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_ADC);
-    uint f_clk_rtc = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_RTC);
-
-    printf("pll_sys  = %dkHz\n", f_pll_sys);
-    printf("pll_usb  = %dkHz\n", f_pll_usb);
-    printf("rosc     = %dkHz\n", f_rosc);
-    printf("clk_sys  = %dkHz\n", f_clk_sys);
-    printf("clk_peri = %dkHz\n", f_clk_peri);
-    printf("clk_usb  = %dkHz\n", f_clk_usb);
-    printf("clk_adc  = %dkHz\n", f_clk_adc);
-    printf("clk_rtc  = %dkHz\n", f_clk_rtc);
-    uart_default_tx_wait_blocking();
-    // Can't measure clk_ref / xosc as it is the ref
+// enable the rosc clock 
+void rosc_enable(void)
+{
+    uint32_t tmp = rosc_hw->ctrl;
+    tmp &= (~ROSC_CTRL_ENABLE_BITS);
+    tmp |= (ROSC_CTRL_ENABLE_VALUE_ENABLE << ROSC_CTRL_ENABLE_LSB);
+    rosc_write(&rosc_hw->ctrl, tmp);
+    // Wait for stable
+    while ((rosc_hw->status & ROSC_STATUS_STABLE_BITS) != ROSC_STATUS_STABLE_BITS);
 }
 
-static void recover_from_sleep(uint scb_orig, uint clock0_orig, uint clock1_orig){
-
-    //Re-enable ring Oscillator control
-    rosc_write(&rosc_hw->ctrl, ROSC_CTRL_ENABLE_BITS);
+// recover from sleep function
+void recover_from_sleep(uint scb_orig, uint clock0_orig, uint clock1_orig){
 
     //reset procs back to default
     scb_hw->scr = scb_orig;
@@ -552,7 +522,6 @@ static void recover_from_sleep(uint scb_orig, uint clock0_orig, uint clock1_orig
 
     //reset clocks
     clocks_init();
-    stdio_init_all();
 
     return;
 }
@@ -565,21 +534,28 @@ void rtc_sleep_until_alarm(ext_rtc_t *EXT_RTC) {
     uint clock0_orig = clocks_hw->sleep_en0;
     uint clock1_orig = clocks_hw->sleep_en1;
 
-    //measure_freqs();
-    //printf("Going to sleep.\r\n");
+    // go to sleep + then wait until dormant.
+    printf("Trying to sleep...");
     sleep_ms(1000);
-    sleep_run_from_xosc();
+    sleep_run_from_rosc();
     sleep_ms(1000);
     sleep_goto_dormant_until_pin(EXT_RTC->ext_int, true, false);
     sleep_ms(1000);
     recover_from_sleep(scb_orig, clock0_orig, clock1_orig);
     sleep_ms(1000);
-    //printf("Woken up! :D :D :D \r\n");
-    //measure_freqs();
+    stdio_init_all();
+    printf("Woken up! :D :D :D \r\n");
 }
 
 ext_rtc_t* rtc_debug(void) {
     ext_rtc_t *EXT_RTC = init_RTC_default();
+
+    *EXT_RTC->alarmbuf = 15;
+    *(EXT_RTC->alarmbuf+1) = 0;
+    *(EXT_RTC->alarmbuf+2) = 1;
+    *(EXT_RTC->alarmbuf+3) = 1; 
+    rtc_set_alarm1(EXT_RTC);
+
     *EXT_RTC->timebuf = 0;
     *(EXT_RTC->timebuf+1) = 0;
     *(EXT_RTC->timebuf+2) = 1;
@@ -587,12 +563,32 @@ ext_rtc_t* rtc_debug(void) {
     *(EXT_RTC->timebuf+4) = 1;
     *(EXT_RTC->timebuf+5) = 1;
     *(EXT_RTC->timebuf+6) = 0;
-    *EXT_RTC->alarmbuf = 30;
-    *(EXT_RTC->alarmbuf+1) = 0;
-    *(EXT_RTC->alarmbuf+2) = 1;
-    *(EXT_RTC->alarmbuf+3) = 1;
     rtc_set_current_time(EXT_RTC);
-    rtc_set_alarm1(EXT_RTC);
+
+    // Read the status register just to double check everything is fine...
+    sleep_ms(1000);
+    uint8_t status_result = 0b00000000; // default status 
+    uint8_t* statres = &status_result;
+
+    // Write the default status 
+    printf("Writing default status...\r\n");
+    rtc_register_write(
+        EXT_RTC,
+        RTC_STATUS,
+        statres,
+        1
+    );
+
+    printf("\r\n Getting the status result for the RTC...");
+    rtc_register_read(
+        EXT_RTC,
+        RTC_STATUS,
+        statres,
+        1
+    );
+    printf("\r\n The status of the RTC register is ... \r\n");
+    toBinary(status_result);
+
     return EXT_RTC;
 
 }
