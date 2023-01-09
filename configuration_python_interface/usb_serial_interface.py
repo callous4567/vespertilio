@@ -35,7 +35,7 @@ def find_configuration():
 
 port = find_configuration()
 print("Opened serial port")
-sert = Serial(port=port.name, baudrate=115200) # timeout is in seconds
+sert = Serial(port=port.name, baudrate=115200, timeout=5) # timeout is in seconds
 
 
 def do_handshake():
@@ -57,7 +57,7 @@ def do_handshake():
     u = sert.readline().decode('UTF-8').strip()
     print(u)
     if u == "Thanks.":
-        print("vespertilio gives us a ", u)
+        print("vespertilio gives us a", u)
     else:
         raise ValueError("No thanks given... we've failed in confirming our affections.")
 
@@ -199,14 +199,19 @@ def send_configuration():
         print(u)
         raise ValueError("Device not ready for configuration... error raised.")
 
-    time.sleep(5e-3) # sleep for flushbuf
+    time.sleep(15e-3) # sleep for flushbuf
     sert.write(dictionary_stringstruct)
 
-    print("Checking if our data was sent fine...")
+    print("Verifying that data sent was correct by reading return...")
+    time.sleep(100e-3)
+    return_stringstruct = sert.read(56) # 56 bytes! Confirm this with the firmware.
 
-    u = sert.readline().decode('UTF-8').strip()
+    if dictionary_stringstruct == return_stringstruct:
+        print("Transaction successful: vespertilio has our data intact!")
+    else:
+        raise RuntimeError("We did not successfully transfer over to vespertilio.")
 
-    print(u)
+    sert.write("Completed.".encode("UTF-8")) # tell vespertilio that we are done- all is good.
 
 
 send_configuration()
