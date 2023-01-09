@@ -1,7 +1,7 @@
 ![](https://github.com/callous4567/Batcorder/blob/main/design_bat.png)
 
 Aye- Latin for bat! Or bats- I have no clue. Witness my first attempts with Microcontrollers, Embedded Programming, C, circuits, and more! I've never
-done electronics, but here she goes! 
+done electronics, but here she goes! ANY AND ALL CODE HERE IS WIP AND IS NOT FINISHED. ANY, AND, ALL, CODE! There are errors in everything! That's because I am just verifying everything! Especially that Python-USB-serial-nonsense! 
 
 This is very much a WIP. There are a bunch of folders... Case has some 3D design stuff for the battery enclosure, 
 configuration_python_interface a way to configure over USB serial- again WIP, Datasheets/etc obvious... Design of Silk has the silkscreen designs,
