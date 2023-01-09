@@ -1,4 +1,4 @@
-# Batcorder, now named "vespertilio"
+![](https://github.com/callous4567/Batcorder/blob/main/design_bat.png)
 
 Aye- Latin for bat! Or bats- I have no clue. Witness my first attempts with Microcontrollers, Embedded Programming, C, circuits, and more! I've never
 done electronics, but here she goes! 
@@ -31,4 +31,3 @@ WHICH INSTEAD OF HAVING A DIFFERENTIAL-INVERTING, HAS AN INVERTING-INVERTING CAS
 
 
 
-![](https://github.com/callous4567/Batcorder/blob/main/design.png)
