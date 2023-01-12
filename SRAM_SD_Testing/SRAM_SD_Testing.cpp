@@ -15,9 +15,9 @@ int main() {
 
     digi_enable();
     ana_enable();
+    debug_init_LED();
     stdio_init_all(); 
-    bool flashresult = configure_flash();
-
+    bool success = usb_configurate();
 
 
     //dpot_dual_t* DPOT = init_dpot();
@@ -39,6 +39,8 @@ int main() {
         sleep_ms(1000);
     }
     */
+    
+    
 
     
     //time_init();

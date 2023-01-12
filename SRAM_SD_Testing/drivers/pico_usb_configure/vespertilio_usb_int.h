@@ -12,7 +12,11 @@
 #include "stdio.h"
 #include "malloc.h"
 #include "hardware/gpio.h"
+#include "../Utilities/utils.h"
+#include "../ext_rtc/ext_rtc.h"
+#include "hardware/flash.h"
+#include "hardware/sync.h"
 
-bool configure_flash(void);
+bool usb_configurate(void);
 
 #endif // VTILIO_USB

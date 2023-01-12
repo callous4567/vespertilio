@@ -29,8 +29,6 @@ add_executable(${PROJECT_NAME}
     drivers/mcp4131_digipot/mcp4131_registers.c
     drivers/mcp4131_digipot/spi_driver.c
     drivers/bme280/bme280_spi.c
-    drivers/pico_usb_configure/pico_flash_registers.c 
-    drivers/pico_usb_configure/pico_flash.c 
     drivers/pico_usb_configure/vespertilio_usb_int.c
     drivers/Utilities/external_config.c 
 )
@@ -57,6 +55,8 @@ target_link_libraries(${PROJECT_NAME}
     pico_stdio_usb
     hardware_flash
     hardware_sync
+    hardware_irq
+    hardware_uart
 )
 
 # Enable UART and USB

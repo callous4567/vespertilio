@@ -15,6 +15,9 @@
 #include "hardware/structs/scb.h"
 #include "hardware/clocks.h"
 #include "../Utilities/utils.h"
+#include "hardware/irq.h"
+//#include "pico/stdio_usb.h"
+//#include "pico/stdio_uart.h"
 
 typedef struct {
 
@@ -54,12 +57,6 @@ void rtc_register_write(
     uint8_t len
 );
 
-// convert uint8_t to BCD uint8_t 
-uint8_t toBCD(uint8_t a);
-
-// convert uint8_t int from BCD 
-uint8_t fromBCD(uint8_t a);
-
 // return the pointer to a malloc'd RTC default based on our config.
 ext_rtc_t* init_RTC_default(void);
 
@@ -80,6 +77,12 @@ ext_rtc_t* rtc_debug(void);
 
 // dormant sleep until alarm. experimental + troublesome- need to test this extensively. 
 void rtc_sleep_until_alarm(ext_rtc_t *EXT_RTC);
+
+// write the default status register just to get the RTC running appropriately 
+void rtc_default_status(ext_rtc_t* EXT_RTC);
+
+// malloc free the RTC 
+void rtc_free(ext_rtc_t* EXT_RTC);
 
 
 #endif /* EXT_RTC_H */

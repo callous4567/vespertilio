@@ -21,4 +21,18 @@ void toBinary(uint8_t a);
 // Print as binary the uint16_t value a
 void toBinary_16(uint16_t a);
 
+// Initialize the LED pin
+void debug_init_LED(void);
+
+// Flash the LED pin (x) times 
+void debug_flash_LED(int32_t x);
+
+
+uint8_t* pack_int32_uint8(int32_t* buf, int32_t len);
+
+
+int32_t* pack_uint8_int32(uint8_t* buf, int32_t len);
+
+
+
 #endif /* IS62_SRAM_H */

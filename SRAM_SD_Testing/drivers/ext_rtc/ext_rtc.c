@@ -1,5 +1,16 @@
 #include "ext_rtc.h"
 
+// free the rtc
+void rtc_free(ext_rtc_t* EXT_RTC) {
+
+    free(EXT_RTC->hw_inst);
+    free(EXT_RTC->timebuf);
+    free(EXT_RTC->alarmbuf);
+    free(EXT_RTC->fullstring);
+    free(EXT_RTC);
+
+}
+
 // convert a 4-bit nibble (inside a uint8_t right bits) to BCD representation 
 static uint8_t toBCD_sub(uint8_t a) {
     switch(a) {
@@ -53,7 +64,7 @@ static uint8_t toBCD_sub(uint8_t a) {
 }
 
 // convert a full 8-bit of two nibbles into packed BCD 
-uint8_t toBCD(uint8_t a) {
+static uint8_t toBCD(uint8_t a) {
 
     return (toBCD_sub(a/10)<<4) | toBCD_sub(a%10);
 }
@@ -113,7 +124,7 @@ static uint8_t fromBCD_sub(uint8_t a) {
 }
 
 // convert a packed 2-BCD BCD to uint8_t 
-uint8_t fromBCD(volatile uint8_t a) {
+static uint8_t fromBCD(volatile uint8_t a) {
     uint8_t result;
     result = 10*fromBCD_sub(a>>4);
     result += fromBCD_sub(a & 0b00001111);
@@ -164,7 +175,7 @@ ext_rtc_t* init_RTC_default(void) {
     7: set to 0 to start oscillator
     6: n/a
     5: whether to interrupt when we ran out of battery juice
-    4-3: Square-wave alarm frequency. Set to 4.096k to have it flip out 4,096 times to wake pico up (01)
+    4-3: Square-wave alarm frequency. 
     2: Whether we enable the alarm activation- we want to. Set to 1.
     1: Set to 1 to enable alarm 2
     0: Set to 1 to enable alarm 2. We only need alarm 1 though so set to 0.
@@ -173,7 +184,6 @@ ext_rtc_t* init_RTC_default(void) {
     uint8_t *RTC_DEFAULT_CONTROL_ptr = &RTC_DEFAULT_CONTROL;
 
     // write our new register
-    printf("Writing default control register...");
     rtc_register_write(
         EXT_RTC,
         RTC_CONTROL,
@@ -193,24 +203,12 @@ ext_rtc_t* init_RTC_default(void) {
     uint8_t *RTC_DEFAULT_TRICKLE_ptr = &RTC_DEFAULT_CONTROL;
 
     // write trickle register 
-    printf("Writing default trickle...");
     rtc_register_write(
         EXT_RTC,
         RTC_TRICKLE,
         RTC_DEFAULT_TRICKLE_ptr,
         1
     );
-
-    // Set some example times on the timebuf just for the sake of giving us some filenames/etc to work with. 
-    /*
-    *EXT_RTC->timebuf = 0;
-    *(EXT_RTC->timebuf+1) = 59;
-    *(EXT_RTC->timebuf+2) = 22;
-    *(EXT_RTC->timebuf+4) = 13;
-    *(EXT_RTC->timebuf+5) = 12;
-    *(EXT_RTC->timebuf+6) = 22;
-    rtc_set_current_time(EXT_RTC);
-    */
 
     // The internal fullstring too
     EXT_RTC->fullstring = (char*)malloc(22);
@@ -254,12 +252,30 @@ void rtc_set_alarm1(
     /*
     To have it go off every day
     we need to set bit 7 to unity for the day-date to be ignored
-    See the datasheet.
-    Also note, we have to set bit 6 to 0 to use the day-of-the-month (not week.)
+    See the datasheet, page 24.
+
+    "
+    The Day, /Date bits (bit 6 of the alarm day/date registers) control whether the alarm value stored in bits 0 ~ 5 of that register
+    reflects the day of the week or the date of the month. If the bit is written to logic 0, the alarm is the result of a match with date of
+    the month. If the bit is written to logic 1, the alarm is the result of a match with day of the week. 
+    "
+
+    We will use day-of-the-week to trigger the alarm (eventually we will include an alarm to configure for day/date, so yeah- this works best.)
+    Note: when you set "Day of the Week" in timebuf, it's arbitrary- monday or tuesday or whatever could be DOTW=1, etc etc...
+    It just counts that DOTW up to 7 then resets, that's it.
+    Anyway,
+
+    Set day-date of the alarm to...
+    0b11000000
+
+    TODO:
+    - Make sure that you can set the alarm day too, if this functionality is desired!
+
+
     */
     uint8_t daydate;
     uint8_t *daydate_ptr = &daydate; 
-    daydate = 0b10000000 | *EXT_RTC->alarmbuf+3;
+    daydate = 0b11000000 | *EXT_RTC->alarmbuf+3;
     rtc_register_write(
         EXT_RTC,
         RTC_ALARM_1_DAYDATES,
@@ -502,7 +518,7 @@ void rtc_read_string_time(ext_rtc_t *EXT_RTC) {
 }
 
 // enable the rosc clock 
-void rosc_enable(void)
+static void rosc_enable(void)
 {
     uint32_t tmp = rosc_hw->ctrl;
     tmp &= (~ROSC_CTRL_ENABLE_BITS);
@@ -512,8 +528,11 @@ void rosc_enable(void)
     while ((rosc_hw->status & ROSC_STATUS_STABLE_BITS) != ROSC_STATUS_STABLE_BITS);
 }
 
-// recover from sleep function
-void recover_from_sleep(uint scb_orig, uint clock0_orig, uint clock1_orig){
+// recover clocks after sleep (only necessary if using XOSC sleep- keep it here though just in case.)
+static void recover_from_sleep(uint scb_orig, uint clock0_orig, uint clock1_orig){
+
+    //Re-enable ring Oscillator control
+    rosc_enable();
 
     //reset procs back to default
     scb_hw->scr = scb_orig;
@@ -522,11 +541,12 @@ void recover_from_sleep(uint scb_orig, uint clock0_orig, uint clock1_orig){
 
     //reset clocks
     clocks_init();
+    //stdio_uart_init();
 
     return;
 }
 
-// enter dormant mode by xosc until RTC alarm is triggered 
+// enter dormant mode by rosc until RTC alarm is triggered 
 void rtc_sleep_until_alarm(ext_rtc_t *EXT_RTC) {
 
     //save values for later
@@ -534,22 +554,40 @@ void rtc_sleep_until_alarm(ext_rtc_t *EXT_RTC) {
     uint clock0_orig = clocks_hw->sleep_en0;
     uint clock1_orig = clocks_hw->sleep_en1;
 
+    // Wait for the fifo to be drained so we get reliable output
+    //uart_default_tx_wait_blocking();
+
     // go to sleep + then wait until dormant.
-    printf("Trying to sleep...");
-    sleep_ms(1000);
     sleep_run_from_rosc();
-    sleep_ms(1000);
     sleep_goto_dormant_until_pin(EXT_RTC->ext_int, true, false);
-    sleep_ms(1000);
     recover_from_sleep(scb_orig, clock0_orig, clock1_orig);
-    sleep_ms(1000);
-    stdio_init_all();
-    printf("Woken up! :D :D :D \r\n");
+
+    // Wait for the fifo to be drained so we get reliable output
+    //uart_default_tx_wait_blocking();
+
 }
 
+void rtc_default_status(ext_rtc_t* EXT_RTC) {
+
+    uint8_t status_result = 0b00000000; // default status 
+    uint8_t* statres = &status_result;
+
+    // Write the default status 
+    rtc_register_write(
+        EXT_RTC,
+        RTC_STATUS,
+        statres,
+        1
+    );
+
+}
+
+
 ext_rtc_t* rtc_debug(void) {
+    
     ext_rtc_t *EXT_RTC = init_RTC_default();
 
+    /*
     *EXT_RTC->alarmbuf = 15;
     *(EXT_RTC->alarmbuf+1) = 0;
     *(EXT_RTC->alarmbuf+2) = 1;
@@ -564,31 +602,12 @@ ext_rtc_t* rtc_debug(void) {
     *(EXT_RTC->timebuf+5) = 1;
     *(EXT_RTC->timebuf+6) = 0;
     rtc_set_current_time(EXT_RTC);
+    */
 
-    // Read the status register just to double check everything is fine...
-    sleep_ms(1000);
-    uint8_t status_result = 0b00000000; // default status 
-    uint8_t* statres = &status_result;
-
-    // Write the default status 
-    printf("Writing default status...\r\n");
-    rtc_register_write(
-        EXT_RTC,
-        RTC_STATUS,
-        statres,
-        1
-    );
-
-    printf("\r\n Getting the status result for the RTC...");
-    rtc_register_read(
-        EXT_RTC,
-        RTC_STATUS,
-        statres,
-        1
-    );
-    printf("\r\n The status of the RTC register is ... \r\n");
-    toBinary(status_result);
+    // Write the status register default 
+    rtc_default_status(EXT_RTC);
 
     return EXT_RTC;
 
 }
+

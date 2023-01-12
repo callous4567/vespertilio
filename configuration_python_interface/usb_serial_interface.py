@@ -4,7 +4,6 @@ import json
 from serial.tools import list_ports
 from serial import Serial
 
-
 def find_configuration():
     # Write our handshake!
     print("Searching for device...")
@@ -127,7 +126,7 @@ def prepare_dictionary():
 
 
 dictionary_config = prepare_dictionary()
-
+print(dictionary_config)
 
 def pack_dictionary():
 
@@ -172,10 +171,9 @@ def pack_dictionary():
     stringstruct = b''
 
     for entry in list(dictionary_config.keys()):
-
-        stringstruct += struct.pack('!i', dictionary_config[entry])
+        stringstruct += struct.pack('<i', dictionary_config[entry])
         # see https://docs.python.org/3/library/struct.html#struct-alignment
-        # we are packing with the ! (network endianness) and i (int 4-byte int32) format
+        # we are packing with the < (little endianness) and i (int 4-byte int32) format
 
     return stringstruct
 
@@ -213,5 +211,20 @@ def send_configuration():
 
     sert.write("Completed.".encode("UTF-8")) # tell vespertilio that we are done- all is good.
 
+    time.sleep(150e-3)
+
+    flash_written_or_not = sert.readline().decode('UTF-8').strip()
+    if flash_written_or_not == "Flash written 1.":
+        print("Slave has written data to flash and configured RTC. All done!")
+    else:
+        raise RuntimeError("Slave has failed to write data to flash and configure RTC.")
+
 
 send_configuration()
+
+print("Configuration has been successful from our side.")
+print("Check vespertilio to confirm LED flashes.")
+print("You can now disconnect USB.")
+for i in range(11):
+    print(("Closing in {0}s ...").format(10-i))
+    time.sleep(1)
