@@ -1,11 +1,10 @@
 ![](https://github.com/callous4567/Batcorder/blob/main/design_bat.png)
 
+A mid-spec battery-powered bat-recorder with an environmental sensor on the board, featuring the BME280 and Knowles Winfrey paired with a Pi Pico, with low-loss parts! Hopefully it'll be a great bat recording device! Hopefully!
+
 This is my: first time with C, first time doing anything electrical/circuits/etc, and one of my first times modelling anything in 3D. Also my first time with PCBs. Thusly, do not expect anything magical- this is all a work-in-progress to make something that performs exceptionally well for bats with exceptional modifiability for the average hobbyist (see: me.)
 
-Every last scrap of code is here, every last design/etc is here, and most importantly, you can program the damn thing with the Pi Pico SDK, arguably the best SDK an MCU has in terms of documentation (and great for the first time C'er, i.e. me.) Plus, cheap. If only the RP2040 had a better ADC, but I'll rectify that later.
-
-NOTE! IMPORTANT NOTE! THE CURRENT GERBER HAS NOT BEEN PRINTED/TESTED. I AM CURRENTLY PROGRAMMING ON THE PREVIOUS VERSION OF THE PCB, 
-WHICH INSTEAD OF HAVING A DIFFERENTIAL-INVERTING, HAS AN INVERTING-INVERTING CASCADE! Other than that, it's the same as this version of the Gerber. 
+Every last scrap of code is here, every last design/etc is here, and most importantly, you can program the damn thing with the Pi Pico SDK, arguably the best SDK an MCU has in terms of documentation (and great for the first time C'er, i.e. me.) Plus, cheap. If only the RP2040 had a better ADC, but I'll rectify that later. 
 
 ## Features/Hardware 
 - BME280 for Environmental Sensing (Temp, Pressure, Humidity)
