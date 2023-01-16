@@ -1,18 +1,10 @@
 ![](https://github.com/callous4567/Batcorder/blob/main/design_bat.png)
 
-Aye- Latin for bat! Or bats- I have no clue. Witness my first attempts with Microcontrollers, Embedded Programming, C, circuits, and more! I've never
-done electronics, but here she goes! ANY AND ALL CODE HERE IS WIP AND IS NOT FINISHED. ANY, AND, ALL, CODE! There are errors in everything! That's because I am just verifying everything! Especially that Python-USB-serial-nonsense! 
+A mid-spec battery-powered bat-recorder with an environmental sensor on the board, featuring the BME280 and Knowles Winfrey paired with a Pi Pico, with low-loss parts! Hopefully it'll be a great bat recording device! Hopefully!
 
-This is very much a WIP. There are a bunch of folders... Case has some 3D design stuff for the battery enclosure, 
-configuration_python_interface a way to configure over USB serial- again WIP, Datasheets/etc obvious... Design of Silk has the silkscreen designs,
-KiCad Schemas has circuit designs, SRAM_SD_Testing is current C codebase. There's also the current Gerber file included.
+This is my: first time with C, first time doing anything electrical/circuits/etc, and one of my first times modelling anything in 3D. Also my first time with PCBs. Thusly, do not expect anything magical- this is all a work-in-progress to make something that performs exceptionally well for bats with exceptional modifiability for the average hobbyist (see: me.)
 
-I've not included the planned software features because I'm very much in the middle of hashing it out at the moment. The initial goal is just a device
-that can be configured by setting up the .json, running a .exe, transferring over a microUSB, then dumping in the field for a recording day. Obviously
-after that point, and verifying that the hardware is gravy, then I can add more software features- for now that is my goal though. 
-
-NOTE! IMPORTANT NOTE! THE CURRENT GERBER HAS NOT BEEN PRINTED/TESTED. I AM CURRENTLY PROGRAMMING ON THE PREVIOUS VERSION OF THE PCB, 
-WHICH INSTEAD OF HAVING A DIFFERENTIAL-INVERTING, HAS AN INVERTING-INVERTING CASCADE! Other than that, it's the same as this version of the Gerber. 
+Every last scrap of code is here, every last design/etc is here, and most importantly, you can program the damn thing with the Pi Pico SDK, arguably the best SDK an MCU has in terms of documentation (and great for the first time C'er, i.e. me.) Plus, cheap. If only the RP2040 had a better ADC, but I'll rectify that later. 
 
 ## Features/Hardware 
 - BME280 for Environmental Sensing (Temp, Pressure, Humidity)
@@ -25,9 +17,10 @@ WHICH INSTEAD OF HAVING A DIFFERENTIAL-INVERTING, HAS AN INVERTING-INVERTING CAS
 - Recommend conformal coating Silicone, avoiding ports on BME280 + Winfrey, to increase resilience to environment (sensor needs exposure.)
 
 ## Planned Hardware Features
-- External ADC rather than RP2040 ADC, giving 16-bit instead of 12-bit ADC performance
-- Transfer BME280 to secondary PCB with wire connector through waterproof case (at moment, need case with hole on bottom) to maximize safety
-- ??? 
+- External ADC rather than RP2040 ADC, giving 14/16-bit instead of 12-bit. Aiming to integrate a MCP33151/41-XX, specifically, or something similarly specced.
+- Transfer BME280 to secondary PCB with wire connector through waterproof case (at moment, need case with hole on bottom) to maximize damage safety, and replace with the BME688 to allow for air quality to also be obtained- the AI module may prove useful. 
+- Reduce PCB size to be comparable to other similar devices (this is my first time on the block- cut me some slack.)
+- Replace Winfrey with Infineon Ultrasonic MEMS when it gets released, which features ultrasonic audio functionality and better performance/SNR/AOP/etc at higher f.
 
 
 
