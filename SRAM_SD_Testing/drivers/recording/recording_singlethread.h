@@ -18,38 +18,30 @@ Paced by Core 0 the cycles will start as on the right:
 The second bit (ADC->BUF_B) won't start without the multicore fifo getting an entry to do it, so yeah. 
 */
 
-// Make a struct to contain all the variables for multicore/recording (seems easiest.) All contents are Malloc'd except for the mSD->sd_card_t 
+// Make a struct to contain all the variables for multicore/recording (seems easiest.) All contents are Malloc'd except for the mSD->sd_card_t. Be very judicious about the malloc fact. 
 typedef struct {
 
     // Pointer to the mSD object responsible for this session. mSD->pSD NOT IN MALLOC.
     mSD_struct_t *mSD;
 
-    // Pointer to the RTC object responsible for this session
+    // Pointer to the RTC object responsible for this session.
     ext_rtc_t *EXT_RTC;
 
-    // Pointers to the multicore functions for audio gathering
-    void (*writebufSD_ptr)(int16_t*, int*, FIL*, UINT*);
-    void (*waittobuf_ptr)(int16_t*, int*);
-    void (*adctobuf_ptr)(int16_t*, int*);
-
-    // Pointers for the buffers & all the channel information/etc 
-    int* BUF_SIZE;
-    uint16_t* BUF_A; 
-    uint16_t* BUF_B;
-    int *ADC_BUFA_CHAN; 
-    int *ADC_BUFB_CHAN; 
-    dma_channel_config *ADC_BUFA_CONF;
+    // Pointers for the buffers & all the channel information/etc. 
+    int16_t* ADC_BUFA_START_ADDRESS; 
+    int16_t* ADC_BUFB_START_ADDRESS; 
+    int16_t *ADC_BUFA_CHAN; 
+    int16_t *ADC_BUFB_CHAN; 
+    dma_channel_config *ADC_BUFA_CONF; 
     dma_channel_config *ADC_BUFB_CONF; 
-    UINT* BUF_A_BW; 
-    UINT* BUF_B_BW;
 
     // BME pointers, too 
     char* BME_DATASTRING;    // bme 20-byte datastring with humidity_pressure_temperature in RH%_pascal_celsius 
     char* BME_AND_TIME_STRING; // 20 byte BME_DATASTRING + the 22 byte EXT_RTC fullstring + a 2-byte "_" spacer + a 1-byte \n newline.
 
 
-} recording_multicore_struct_t; 
+} recording_multicore_struct_single_t; 
+
 
 // run the sequence. initialize this at the time the recordings should start. I recommend starting the recordings 20-30 minutes beforehand to allow all hardware to equalize/self-heat.
-void run_wav_bme_sequence();
-
+void run_wav_bme_sequence_single();
