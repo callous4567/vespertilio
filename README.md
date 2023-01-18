@@ -3,7 +3,7 @@
 ## General description 
 A mid-spec battery-powered bat-recorder with an environmental sensor on the board, featuring the BME280 and Knowles Winfrey paired with a Pi Pico, with low-loss parts! Hopefully it'll be a great bat recording device! Hopefully!
 
-This is my: first time with C, first time doing anything electrical/circuits/etc, and one of my first times modelling anything in 3D. Also my first time with PCBs. Thusly, do not expect anything magical- this is all a work-in-progress to make something that performs exceptionally well for bats with exceptional modifiability for the average hobbyist (see: me.)
+This is my: first time with C, first time doing anything electrical/circuits/etc, and one of my first times modelling anything in 3D. Also my first time with PCBs. Thusly, do not expect anything magical- this is all a work-in-progress to make something that performs exceptionally well for bats with exceptional modifiability for the average hobbyist (see: me.) ***This page is extremely WIP, by the way. Most code here will not work- note how there are no "releases"!***
 
 Every last scrap of code is here, every last design/etc is here, and most importantly, you can program the damn thing with the Pi Pico SDK, arguably the best SDK an MCU has in terms of documentation (and great for the first time C'er, i.e. me.) Plus, cheap. If only the RP2040 had a better ADC, but I'll rectify that later. 
 
