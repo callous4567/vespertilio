@@ -27,27 +27,21 @@ Something like that
 
 Need to account for timing to allow extra function calls, i.e. BME280 data collection, that sort of thing. One BME call takes about 3-4 milliseconds which is a timing nightmare for 384 kHz if you only single-core it. 
 In such a case, I would recommend that multicore is used. 
+
+This is very troublesome- the multicored version is much easier to run. 
 */
 
 /*
 initialize the DMA channels and also the buffers we will be using 
 */
 
-static const int32_t BUFAB_ADCBUF_MULTIPLIER = 3; // multiplier of ADC_BUF_SIZE from the multithreaded arrangement, to let us use the same external configuration/etc: changes the size of the total buffer, thus number of cycles 
-static const int32_t ADC_BUFB_TIME = 3; // in milliseconds, the length of buffer B, the second half of BUFAB. This might need to be increased for slower microSD cards.
-
+static const int32_t ADC_BLOCKBUF_SIZE = 1024; // two SD card blocks (512 bytes*2.) 
+static const int32_t ADC_BLOCKTRANSFER_SIZE = ADC_BLOCKBUF_SIZE/4; // 256 samples -> 512 bytes -> one block 
 
 static void init_dma_buf(recording_multicore_struct_single_t* multicore_struct) {
 
-    // malloc up the total buffer 
-    int16_t ADC_BUFAB_SIZE = BUFAB_ADCBUF_MULTIPLIER*ADC_BUF_SIZE; // total buffer size BUFAB, in multiple of the multithreaded buffer size, in unit of samples (uint16_t)
-    multicore_struct->ADC_BUFA_START_ADDRESS = (int16_t*)malloc(ADC_BUFAB_SIZE*sizeof(int16_t));
-
-    // Set buffer sizes/etc for both buffers + set the offset on BUFB
-    int32_t ADC_BUFB_SIZE = ADC_BUFB_TIME * ADC_SAMPLE_RATE / 1000; // sample offset from the end (number of samples BUFB holds) 
-    int32_t ADC_BUFA_SIZE = ADC_BUFAB_SIZE - ADC_BUFB_SIZE; // offset from the start (number of samples BUFA holds) for BUFB, alongside the size of BUFA.
-    multicore_struct->ADC_BUFB_START_ADDRESS = multicore_struct->ADC_BUFA_START_ADDRESS + ADC_BUFA_SIZE;
-
+    // The buffer
+    multicore_struct->ADC_BUFA = (int16_t*)malloc(ADC_BLOCKBUF_SIZE);
     // Configure DMA channel from ADC to buffer A
     *multicore_struct->ADC_BUFA_CHAN = dma_claim_unused_channel(true);
     *multicore_struct->ADC_BUFA_CONF = dma_channel_get_default_config(*multicore_struct->ADC_BUFA_CHAN);
@@ -55,35 +49,16 @@ static void init_dma_buf(recording_multicore_struct_single_t* multicore_struct) 
     channel_config_set_read_increment(multicore_struct->ADC_BUFA_CONF, false);
     channel_config_set_write_increment(multicore_struct->ADC_BUFA_CONF, true);
     channel_config_set_dreq(multicore_struct->ADC_BUFA_CONF, DREQ_ADC);
+
+    // Apply the configurations (MUST BE DONE AFTER SETTING UP THE CONFIG OBJECTS!!!) https://forums.raspberrypi.com/viewtopic.php?t=335738
     dma_channel_configure(
         *multicore_struct->ADC_BUFA_CHAN,
         multicore_struct->ADC_BUFA_CONF,
-        multicore_struct->ADC_BUFA_START_ADDRESS,
+        multicore_struct->ADC_BUFA,
         &adc_hw->fifo,
-        ADC_BUFA_SIZE, 
+        ADC_BLOCKTRANSFER_SIZE, 
         false
     );
-
-    // Configure DMA channel from ADC to buffer B
-    *multicore_struct->ADC_BUFB_CHAN = dma_claim_unused_channel(true);
-    *multicore_struct->ADC_BUFB_CONF = dma_channel_get_default_config(*multicore_struct->ADC_BUFB_CHAN);
-    channel_config_set_transfer_data_size(multicore_struct->ADC_BUFB_CONF, DMA_SIZE_16);
-    channel_config_set_read_increment(multicore_struct->ADC_BUFB_CONF, false);
-    channel_config_set_write_increment(multicore_struct->ADC_BUFB_CONF, true);
-    channel_config_set_dreq(multicore_struct->ADC_BUFB_CONF, DREQ_ADC);
-    dma_channel_configure(
-        *multicore_struct->ADC_BUFB_CHAN,
-        multicore_struct->ADC_BUFB_CONF,
-        multicore_struct->ADC_BUFB_START_ADDRESS,
-        &adc_hw->fifo,
-        ADC_BUFB_SIZE, 
-        false
-    );
-
-    // Also configure the chain: BUFB will trigger BUFA which will trigger BUFB with no delays, ideally.
-    channel_config_set_chain_to(multicore_struct->ADC_BUFA_CONF, *multicore_struct->ADC_BUFB_CHAN); 
-    channel_config_set_chain_to(multicore_struct->ADC_BUFB_CONF, *multicore_struct->ADC_BUFA_CHAN);
-
 
 }
 
@@ -100,29 +75,7 @@ static void setup_adc(void) {
     adc_select_input(ADC_PIN - 26); // select input from appropriate input
     adc_clock_divisor();
     adc_fifo_setup(true, true, 1, false, false);
-    adc_run(true);
-}
-
-// Write an int16_t BUF_ of size BUF_SIZE to the provided file object- just a helper. Verifies that the correct n0 of bytes are written. 
-static void write_BUF__SD(
-    int16_t *BUF_,
-    int BUF_SIZE,
-    FIL *fp,
-    UINT *bw
-) {
-
-    // use f_write to write BUF_A. note that BUF_A is uint16_t and hence bytes written must be double the buf size. 
-    f_write(
-        fp,
-        BUF_,
-        BUF_SIZE*2,
-        bw
-    );
-
-    if (*bw!=(BUF_SIZE*2)) {
-        panic("The bytes written does not equal double the uint16_t buffer size in write_BUF_A_SD in SRAM_SD_Testing.cpp. FUCK! %u, %u", *bw, 2*BUF_SIZE);
-    }
-
+    adc_run(false);
 }
 
 // write the 44-byte WAV header required for the .wave format (do this after opening file and initiating recording.)
@@ -257,8 +210,6 @@ static recording_multicore_struct_single_t* audiostruct_generate_single(void) {
     // Allocate everything for the ADC buffers (start addresses are programmed later, in init_dma_buf)
     multicore_struct->ADC_BUFA_CHAN = (int16_t*)malloc(sizeof(int16_t)); 
     multicore_struct->ADC_BUFA_CONF = (dma_channel_config*)malloc(sizeof(dma_channel_config)); 
-    multicore_struct->ADC_BUFB_CHAN = (int16_t*)malloc(sizeof(int16_t)); 
-    multicore_struct->ADC_BUFB_CONF = (dma_channel_config*)malloc(sizeof(dma_channel_config)); 
 
     // Now allocate mSD pointers where appropriate
     multicore_struct->mSD = (mSD_struct_t*)malloc(sizeof(mSD_struct_t)); 
@@ -391,6 +342,9 @@ void run_wav_bme_sequence_single(void) {
     printf("Generating struct");
     recording_multicore_struct_single_t* test_struct = audiostruct_generate_single();
 
+    // init the DMA configuration
+    init_dma_buf(test_struct);
+
     // mount the SD volume
     printf("Mounting SD card volume.");
     FRESULT fr = f_mount(&test_struct->mSD->pSD->fatfs, test_struct->mSD->pSD->pcName, 1); 
@@ -401,48 +355,28 @@ void run_wav_bme_sequence_single(void) {
         setup_bme();
     }
 
+    rtc_read_time(test_struct->EXT_RTC);
+    datetime_t* dtime = init_pico_rtc(test_struct->EXT_RTC); // init the pico RTC + configure from the external RTC
+
     printf("The number of files is...! %d ... starting recording session.\r\n", RECORDING_NUMBER_OF_FILES);
     for (int j = 0; j < RECORDING_NUMBER_OF_FILES; j++) {
 
+        printf("File number %d\r\n", j);
+        
+        rtc_read_time(test_struct->EXT_RTC);
+        update_pico_rtc(test_struct->EXT_RTC, dtime); // update the pico RTC for file writing
+
         init_wav_file(test_struct);   // initiate the wav file + BME if we are to use it
-        if (USE_BME==true) {
-            init_bme_file(test_struct);
-        }
-        
-        RECORDING_NUMBER_OF_CYCLES = RECORDING_FILE_DATA_SIZE/(ADC_BUF_SIZE*BUFAB_ADCBUF_MULTIPLIER*2); // assuming one cycle is a total of three ADC_BUF_SIZE sample buffers in int16_t's, then multiply by 2 for bytes 
-        BME_RECORD_PERIOD_CYCLES = BME_RECORD_PERIOD_SECONDS*ADC_SAMPLE_RATE/(ADC_BUF_SIZE*BUFAB_ADCBUF_MULTIPLIER); // BME period in seconds * cycles per second 
-        
         adc_fifo_drain();   // drain fifo 
-        dma_channel_start(*test_struct->ADC_BUFA_CHAN);   // trigger BUFA, which will chain to BUFB automatically. This cycle will only end when we forcibly disable the DMA channels at the end of the cycles.
-
-        for (int i = 0; i < RECORDING_NUMBER_OF_CYCLES; i++) {
-
-            dma_channel_set_write_addr(*test_struct->ADC_BUFB_CHAN, test_struct->ADC_BUFB_START_ADDRESS, false); // reset BUFB write address before it starts
-            dma_channel_wait_for_finish_blocking(*test_struct->ADC_BUFA_CHAN); // wait for BUFA to finish 
-            dma_channel_set_write_addr(*test_struct->ADC_BUFA_CHAN, test_struct->ADC_BUFA_START_ADDRESS, false); // reset BUFA write address after it ends
-
-            write_BUF__SD( // start the SD card write ADC_BUFB_TIME before the cycle ends 
-                test_struct->ADC_BUFA_START_ADDRESS,
-                BUFAB_ADCBUF_MULTIPLIER*ADC_BUF_SIZE,
-                test_struct->mSD->fp_audio,
-                test_struct->mSD->bw
-            ); 
-
-            if (USE_BME==true) { // the second the audio buffer is written, write the BME 
-
-                if (i%BME_RECORD_PERIOD_CYCLES==0) {
-
-                    bmetimestring_generate(test_struct);
-                    bmetimestring_puts(test_struct);
-
-                }
-
-            }
-
-        }
-
-        // done (we just need to wait for the previous f_write to finish up)
-        
+        adc_run(true);
+        dma_channel_set_write_addr(*test_struct->ADC_BUFA_CHAN, test_struct->ADC_BUFA, true);    // trigger DMA to the first half of the buffer immediately 
+        f_write_audiobuf(
+            test_struct->mSD->fp_audio,
+            test_struct->ADC_BUFA,
+            RECORDING_FILE_DATA_SIZE,
+            test_struct->mSD->bw,
+            *test_struct->ADC_BUFA_CHAN
+        );
         fr = f_close(test_struct->mSD->fp_audio);
         if (FR_OK != fr) {
             printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
@@ -452,6 +386,7 @@ void run_wav_bme_sequence_single(void) {
             if (FR_OK != fr) {
                 printf("f_close error environmental: %s (%d)\n", FRESULT_str(fr), fr);
             }
+
         }
 
     }

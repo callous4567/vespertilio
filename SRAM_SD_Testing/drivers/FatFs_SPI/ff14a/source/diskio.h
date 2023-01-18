@@ -30,6 +30,12 @@ DSTATUS disk_initialize (BYTE pdrv);
 DSTATUS disk_status (BYTE pdrv);
 DRESULT disk_read (BYTE pdrv, BYTE* buff, LBA_t sector, UINT count);
 DRESULT disk_write (BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count);
+DRESULT disk_write_audiobuf(BYTE pdrv, /* Physical drive nmuber to identify the drive */
+                   const BYTE *buff, /* Data to be written */
+                   LBA_t sector,     /* Start sector in LBA */
+                   UINT count,        /* Number of sectors to write */
+                   int32_t DMA_CHAN_BUF /* DMA channel for the buffer */
+);
 DRESULT disk_ioctl (BYTE pdrv, BYTE cmd, void* buff);
 
 

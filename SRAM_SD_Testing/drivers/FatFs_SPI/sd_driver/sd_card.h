@@ -80,6 +80,16 @@ bool sd_init_driver();
 int sd_init(sd_card_t *pSD);
 int sd_write_blocks(sd_card_t *pSD, const uint8_t *buffer,
                     uint64_t ulSectorNumber, uint32_t blockCnt);
+
+// use this one if you want to write audio from the provided buffer + have the buffer overwrite itself to do so
+// note that buffer should be 1024=512*2 bytes
+// the first half will be written while the second half is DMA'd (so ensure it has been DMA'd beforehand)
+// the second half will be written while the first half is DMA'd 
+// make sure to configure up the DMA channel to write 512 bytes worth of data to the correct start address (the start of buf)
+int sd_write_audioblocks(sd_card_t *pSD, const uint8_t *buffer,
+                    uint64_t ulSectorNumber, uint32_t blockCnt,
+                    int32_t DMA_CHAN_BUF);
+
 int sd_read_blocks(sd_card_t *pSD, uint8_t *buffer, uint64_t ulSectorNumber,
                    uint32_t ulSectorCount);
 bool sd_card_detect(sd_card_t *pSD);

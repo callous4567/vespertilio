@@ -22,13 +22,13 @@ The file will look something like this...
 
 
 
-ADC_SAMPLE_RATE: in Hz, sampling rate of the device.
+ADC_SAMPLE_RATE: in Hz, sampling rate of the device. There is a limit of 499,999 (qualified on a Sandisk Ultra 64 GB to work at 480 kHz)
 RECORDING_SESSION_LENGTH_MINUTES: the length of the recording session, in minutes. 
 RECORDING_MINUTES_PER_SUBRECORDING: minutes per recording. We must split recording sessions to minimize number of corrupted files.
 START_MINUTE: 0:59, which minute to start the recording on. By default, we start at second=0.
 START_HOUR: 0:23, which hour to start the recording on.
-USE_BME: true-false on whether to use environmental sensing 
-BME_PERIOD_SECONDS: period, in seconds, for environmental sensing 
+USE_BME: true-false on whether to use environmental sensing. Note that this may add file delay. 
+BME_PERIOD_SECONDS: period, in seconds, for environmental sensing. Higher = better for file delay.
 
 
 

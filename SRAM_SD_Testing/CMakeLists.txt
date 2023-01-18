@@ -21,16 +21,17 @@ set(CMAKE_CXX_STANDARD 17)
 add_executable(${PROJECT_NAME} 
     SRAM_SD_Testing.cpp
     drivers/Utilities/utils.c
+    drivers/Utilities/external_config.c
     drivers/mSD/mSD.c
     drivers/mSD/hw_config.c
     drivers/ext_rtc/ext_rtc_registers.c 
     drivers/ext_rtc/ext_rtc.c 
     drivers/recording/recording.c
+    drivers/recording/recording_singlethread.c
     drivers/mcp4131_digipot/mcp4131_registers.c
     drivers/mcp4131_digipot/spi_driver.c
     drivers/bme280/bme280_spi.c
     drivers/pico_usb_configure/vespertilio_usb_int.c
-    drivers/Utilities/external_config.c 
 )
 
 # Create map/bin/hex/uf2 files
@@ -60,8 +61,9 @@ target_link_libraries(${PROJECT_NAME}
 )
 
 # Enable UART and USB
-pico_enable_stdio_usb(${PROJECT_NAME} 1)
-pico_enable_stdio_uart(${PROJECT_NAME} 0)
+pico_enable_stdio_usb(${PROJECT_NAME} 0)
+pico_enable_stdio_uart(${PROJECT_NAME} 1)
+
 
 # COMMAND TO MAKE/BUILD/ETC the Cmake files 
 # cmake -G "MinGW Makefiles" .. 

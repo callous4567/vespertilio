@@ -3,19 +3,8 @@
 #define EXT_RTC_H
 
 #include "ext_rtc_registers.h"
-#include <stdio.h>
-#include <string.h>
-#include "pico/stdlib.h"
-#include "pico/binary_info.h"
-#include "hardware/gpio.h"
-#include "malloc.h"
-#include "pico/time.h"
-#include "pico/sleep.h"
-#include "hardware/rosc.h"
-#include "hardware/structs/scb.h"
-#include "hardware/clocks.h"
-#include "../Utilities/utils.h"
-#include "hardware/irq.h"
+#include "hardware/i2c.h"
+#include "hardware/rtc.h" // for the sake of interfacing with the pico RTC 
 //#include "pico/stdio_usb.h"
 //#include "pico/stdio_uart.h"
 
@@ -84,5 +73,10 @@ void rtc_default_status(ext_rtc_t* EXT_RTC);
 // malloc free the RTC 
 void rtc_free(ext_rtc_t* EXT_RTC);
 
+// initiate + update the pi pico intRTC (returns datetime_t object under malloc)
+datetime_t* init_pico_rtc(ext_rtc_t* EXT_RTC);
+
+// update the internal RTC of the pico 
+void update_pico_rtc(ext_rtc_t* EXT_RTC, datetime_t* dtime);
 
 #endif /* EXT_RTC_H */

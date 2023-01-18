@@ -1,9 +1,6 @@
 #ifndef EXT_RTC_REGS
 #define EXT_RTC_REGS
 
-#include <string.h>
-#include <stdbool.h>
-#include <stdint.h>
 #include "hardware/i2c.h"
 
 // Note the presence of the interrupt pin for this particular RTC

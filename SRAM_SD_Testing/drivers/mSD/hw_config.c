@@ -36,7 +36,7 @@ static const int SD_SPI_RX_PIN = 12;// Yellow
 static const int SD_SPI_CSN_PIN = 13; // White 
 static const int SD_SPI_SCK_PIN = 14; // Blue
 static const int SD_SPI_TX_PIN =  15; // Green 
-static const int SD_BAUDRATE = 25*1000*1000; // baudrate 
+static const int SD_BAUDRATE = 35*1000*1000; // testing at 0.5 MHz 25*1000*1000; // baudrate 
 
 // The hardware configuration for the SD card we're using. 
 static spi_t spis[] = {  // One for each SPI.

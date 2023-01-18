@@ -34,7 +34,12 @@ def find_configuration():
 
 port = find_configuration()
 print("Opened serial port")
-sert = Serial(port=port.name, baudrate=115200, timeout=5) # timeout is in seconds
+sert = Serial(port=port.name, baudrate=115200, timeout=3) # timeout is in seconds
+
+
+def flushbuf():
+    sert.flushInput()
+    sert.flushOutput()
 
 
 def do_handshake():
@@ -52,13 +57,14 @@ def do_handshake():
     print("Sent our acceptance... now we wait for confirmation...")
 
     # Wait for it to accept the true, then check for a thanks!
-    time.sleep(5e-3)
+    time.sleep(10e-3)
     u = sert.readline().decode('UTF-8').strip()
     print(u)
     if u == "Thanks.":
         print("vespertilio gives us a", u)
     else:
         raise ValueError("No thanks given... we've failed in confirming our affections.")
+
 
 
 do_handshake()
@@ -112,7 +118,24 @@ def prepare_dictionary():
     ordered_dictionary['SECOND'] = current_time.tm_sec
     ordered_dictionary['MINUTE'] = current_time.tm_min
     ordered_dictionary['HOUR'] = current_time.tm_hour
-    ordered_dictionary['DOTW'] = current_time.tm_wday + 1  # correct DOTW to the RTC version
+
+    """
+    https://docs.python.org/3/library/time.html
+    The RTC is [1,7]
+    The localtime() is [0,6]
+    Hence add 1 to make it [1,7]
+    Monday = 0 -> Monday = 1 (see link, Monday = 0.)
+    Now, on the RTC we have [1,7] 
+    We need the RTC to register 1 as Sunday
+    Consequently, We need Monday to be equal to 2 in ordered_dictionary
+    So, 0 -> 2 is our necessary translation
+    Add 2 to ordered_dictionary['DOTW']
+    The final value (sunday in localtime) will roll over to 6 + 2 = 8, which is now set to unity- the first dotw.)
+    """
+    ordered_dictionary['DOTW'] = current_time.tm_wday + 2
+    if ordered_dictionary['DOTW'] == 8:
+        ordered_dictionary['DOTW'] = 1
+
     ordered_dictionary['DOTM'] = current_time.tm_mday
     ordered_dictionary['MONTH'] = current_time.tm_mon
     ordered_dictionary['YEAR'] = int(str(current_time.tm_year)[2:4])
@@ -120,7 +143,6 @@ def prepare_dictionary():
     # Finally, add in our alarm times, too
     ordered_dictionary['ALARM_MIN'] = json_config['START_MINUTE']
     ordered_dictionary['ALARM_HOUR'] = json_config['START_HOUR']
-
 
     return ordered_dictionary
 
@@ -155,7 +177,7 @@ def pack_dictionary():
     5) int32_t SECOND;
     6) int32_t MINUTE;
     7) int32_t HOUR;
-    8) int32_t DOTW;
+    8) int32_t DOTW; // 1=SUNDAY (Mon = 2, Tues = 3, etc)
     9) int32_t DOTM;
     10) int32_t MONTH;
     11) int32_t YEAR;
@@ -174,6 +196,8 @@ def pack_dictionary():
         stringstruct += struct.pack('<i', dictionary_config[entry])
         # see https://docs.python.org/3/library/struct.html#struct-alignment
         # we are packing with the < (little endianness) and i (int 4-byte int32) format
+
+    print("Len of the data string in bytes is ... ", len(stringstruct.decode('UTF-8')))
 
     return stringstruct
 
@@ -197,23 +221,34 @@ def send_configuration():
         print(u)
         raise ValueError("Device not ready for configuration... error raised.")
 
-    time.sleep(15e-3) # sleep for flushbuf
+    time.sleep(50e-3)
+
     sert.write(dictionary_stringstruct)
 
     print("Verifying that data sent was correct by reading return...")
-    time.sleep(100e-3)
-    return_stringstruct = sert.read(56) # 56 bytes! Confirm this with the firmware.
+    return_stringstruct = sert.read(80).replace(b'\r', b'')  # 100 bytes max! Confirm this with the firmware.
+    # We set this to 100 bytes because the pico sends nasty ass \r's.
 
     if dictionary_stringstruct == return_stringstruct:
         print("Transaction successful: vespertilio has our data intact!")
     else:
+        print(dictionary_stringstruct)
+        print(return_stringstruct)
+        unpacked_iter_dict = struct.iter_unpack('<i', dictionary_stringstruct)
+        unpacked_iter_retr = struct.iter_unpack('<i', return_stringstruct)
+        for i in range(0,14):
+            print(next(unpacked_iter_dict), next(unpacked_iter_retr))
         raise RuntimeError("We did not successfully transfer over to vespertilio.")
 
-    sert.write("Completed.".encode("UTF-8")) # tell vespertilio that we are done- all is good.
+    time.sleep(5e-3)
+    flushbuf()
+    time.sleep(5e-3)
 
-    time.sleep(150e-3)
+    sert.write("Completed.".encode("UTF-8"))  # tell vespertilio that we are done- all is good.
 
+    time.sleep(100e-3)
     flash_written_or_not = sert.readline().decode('UTF-8').strip()
+    print(flash_written_or_not)
     if flash_written_or_not == "Flash written 1.":
         print("Slave has written data to flash and configured RTC. All done!")
     else:

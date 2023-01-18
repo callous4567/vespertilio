@@ -1,4 +1,14 @@
 #include "ext_rtc.h"
+#include "ext_rtc_registers.h"
+#include "../Utilities/utils.h"
+#include "hardware/gpio.h"
+#include "malloc.h"
+#include "pico/time.h"
+#include "pico/sleep.h"
+#include "hardware/rosc.h"
+#include "hardware/structs/scb.h"
+#include "hardware/clocks.h"
+#include "hardware/irq.h"
 
 // free the rtc
 void rtc_free(ext_rtc_t* EXT_RTC) {
@@ -582,7 +592,7 @@ void rtc_default_status(ext_rtc_t* EXT_RTC) {
 
 }
 
-
+// just generates a conveniently programmed RTC for debugging purposes (malloc'd obviously/etc.)
 ext_rtc_t* rtc_debug(void) {
     
     ext_rtc_t *EXT_RTC = init_RTC_default();
@@ -611,3 +621,33 @@ ext_rtc_t* rtc_debug(void) {
 
 }
 
+// will initialize the internal RTC and set it to the internal time of the provided ext_rtc_t. you need to set the ext_rtc time first.
+datetime_t* init_pico_rtc(ext_rtc_t* EXT_RTC) {
+
+    rtc_init();
+    datetime_t* dtime = (datetime_t*)malloc(sizeof(datetime_t));
+    dtime->sec   =   *(EXT_RTC->timebuf    )          ; // We have set the configuration code up appropriately so that sunday is DOTW=1 on the ext RTC and 0 on the int RTC.
+    dtime->min   =   *(EXT_RTC->timebuf + 1)          ; // USE 0 FOR SUNDAY ON THE EXTERNAL RTC!!! IMPORTANT!!!
+    dtime->hour  =   *(EXT_RTC->timebuf + 2)          ; // NOTE THAT DAY OF THE WEEK ON THE PICO HAS 0 FOR SUNDAY! 
+    dtime->dotw  =   *(EXT_RTC->timebuf + 3) - 1      ; // the external RTC has day of the week [01,07] 
+    dtime->day   =   *(EXT_RTC->timebuf + 4)          ; // https://raspberrypi.github.io/pico-sdk-doxygen/structdatetime__t.html
+    dtime->month =   *(EXT_RTC->timebuf + 5)          ; // the pi pico has [0,6] though 
+    dtime->year  =   *(EXT_RTC->timebuf + 6) + 2000   ; // on the pico, year is [0,4095] so yeah , on the RTC [00,99]
+    rtc_set_datetime(dtime);
+    return dtime;
+
+}
+
+// update the internal RTC of the pico from the provided ext_rtc_t. you need to set the ext_rtc time first.
+void update_pico_rtc(ext_rtc_t* EXT_RTC, datetime_t* dtime) {
+
+    dtime->sec   =   *(EXT_RTC->timebuf    )          ;
+    dtime->min   =   *(EXT_RTC->timebuf + 1)          ; 
+    dtime->hour  =   *(EXT_RTC->timebuf + 2)          ; 
+    dtime->dotw  =   *(EXT_RTC->timebuf + 3) - 1      ; 
+    dtime->day   =   *(EXT_RTC->timebuf + 4)          ; 
+    dtime->month =   *(EXT_RTC->timebuf + 5)          ; 
+    dtime->year  =   *(EXT_RTC->timebuf + 6) + 2000   ; 
+    rtc_set_datetime(dtime);
+
+}

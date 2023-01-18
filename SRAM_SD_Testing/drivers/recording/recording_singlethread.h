@@ -28,12 +28,9 @@ typedef struct {
     ext_rtc_t *EXT_RTC;
 
     // Pointers for the buffers & all the channel information/etc. 
-    int16_t* ADC_BUFA_START_ADDRESS; 
-    int16_t* ADC_BUFB_START_ADDRESS; 
+    int16_t* ADC_BUFA; 
     int16_t *ADC_BUFA_CHAN; 
-    int16_t *ADC_BUFB_CHAN; 
     dma_channel_config *ADC_BUFA_CONF; 
-    dma_channel_config *ADC_BUFB_CONF; 
 
     // BME pointers, too 
     char* BME_DATASTRING;    // bme 20-byte datastring with humidity_pressure_temperature in RH%_pascal_celsius 

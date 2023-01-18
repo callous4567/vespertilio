@@ -898,6 +898,7 @@ int sd_read_blocks(sd_card_t *pSD, uint8_t *buffer, uint64_t ulSectorNumber,
 
 static uint8_t sd_write_block(sd_card_t *pSD, const uint8_t *buffer,
                               uint8_t token, uint32_t length) {
+
     uint16_t crc = (~0);
     uint8_t response = 0xFF;
 
@@ -907,6 +908,7 @@ static uint8_t sd_write_block(sd_card_t *pSD, const uint8_t *buffer,
     // write the data
     bool ret = sd_spi_transfer(pSD, buffer, NULL, length);
     myASSERT(ret);
+
 
 #if SD_CRC_ENABLED
     if (crc_on) {
@@ -928,6 +930,164 @@ static uint8_t sd_write_block(sd_card_t *pSD, const uint8_t *buffer,
     }
     return (response & SPI_DATA_RESPONSE_MASK);
 }
+
+/** In the case of single-block writes, the block is written and afterward the ADC is automatically triggered to fill it up again
+ * In the case of multi-block writes, the first half of the block (512 bytes) is written, and while being written, the second half is filled 
+ * After this, the second half is written, while the first is filled
+ * This ping-pong continues until blockCnt has been satisfied (the pingponging ensures that enough time is given for each block to write.)
+ * Theoretically, a 512-byte pingpong gives 0.67 ms for each block to write, giving a minimum throughput requirement of 0.76 mBps
+ * In reality, the block write will be faster than this (one would hope) meaning that this will be safe for 384 kHz. I hope.
+ * Note some important... notes
+ * Buffer here is cast ias uint8_t raw data through  * 	const BYTE *wbuff = (const BYTE*)buff;  in ff.c 
+ * The initial address of this buffer wbuff is equivalent to our buffer that we feed f_write
+ * It is in units of bytes- 8 bits
+ * Consequently, we just need to set our ADC DMA to do transfers of 256 samples, and we can do addresses/etc the same as usual
+ * 
+ * NOTE NOTE NOTE NOTE NOTE NOTE NOTE
+ * DMA TRANSFERS IN HERE ARE NON BLOCKING! We assume that if we have to block, then the speed isn't tolerable + errors up.
+ * 
+ *  @param buffer       Buffer of data to write to blocks: this is wbuff from ff.c, and is 8-bit data. See 
+ *  @param ulSectorNumber     Logical Address of block to begin writing to (LBA)
+ *  @param blockCnt     Size to write in blocks
+ *  @param DMA_CHAN_BUF Configured to fill buffer1 from ADC in batches of 512 bytes/256 samples with all the other correct bits.
+ *  @return         SD_BLOCK_DEVICE_ERROR_NONE(0) - success
+ *                  SD_BLOCK_DEVICE_ERROR_NO_DEVICE - device (SD card) is
+ * missing or not connected SD_BLOCK_DEVICE_ERROR_CRC - crc error
+ *                  SD_BLOCK_DEVICE_ERROR_PARAMETER - invalid parameter
+ *                  SD_BLOCK_DEVICE_ERROR_UNSUPPORTED - unsupported command
+ *                  SD_BLOCK_DEVICE_ERROR_NO_INIT - device is not initialized
+ *                  SD_BLOCK_DEVICE_ERROR_WRITE - SPI write error
+ *                  SD_BLOCK_DEVICE_ERROR_ERASE - erase error
+ */
+static int in_sd_write_audioblocks(sd_card_t *pSD, const uint8_t *buffer,
+                              uint64_t ulSectorNumber, uint32_t blockCnt, int32_t DMA_CHAN_BUF) {
+    if (ulSectorNumber + blockCnt > pSD->sectors)
+        return SD_BLOCK_DEVICE_ERROR_PARAMETER;
+    if (pSD->m_Status & (STA_NOINIT | STA_NODISK))
+        return SD_BLOCK_DEVICE_ERROR_PARAMETER;
+
+    int status = SD_BLOCK_DEVICE_ERROR_NONE;
+    uint8_t response;
+    uint64_t addr;
+
+    // SDSC Card (CCS=0) uses byte unit address
+    // SDHC and SDXC Cards (CCS=1) use block unit address (512 Bytes unit)
+    if (SDCARD_V2HC == pSD->card_type) {
+        addr = ulSectorNumber;
+    } else {
+        addr = ulSectorNumber * _block_size;
+    }
+    // Send command to perform write operation
+    if (blockCnt == 1) {
+        // Single block write command
+        if (SD_BLOCK_DEVICE_ERROR_NONE !=
+            (status = sd_cmd(pSD, CMD24_WRITE_BLOCK, addr, false, 0))) {
+            return status;
+        }
+
+        // wait for the dma to finish 
+        dma_channel_wait_for_finish_blocking(DMA_CHAN_BUF);
+        
+        // Write data
+        response = sd_write_block(pSD, buffer, SPI_START_BLOCK, _block_size);
+
+        // trigger DMA to the first half of the buffer immediately 
+        dma_channel_set_write_addr(DMA_CHAN_BUF, (uint8_t*)buffer, true);
+
+        // Only CRC and general write error are communicated via response token
+        if (response != SPI_DATA_ACCEPTED) {
+            DBG_PRINTF("Single Block Write failed: 0x%x \r\n", response);
+            status = SD_BLOCK_DEVICE_ERROR_WRITE;
+        }
+    } else {
+
+        // Pre-erase setting prior to multiple block write operation
+        sd_cmd(pSD, ACMD23_SET_WR_BLK_ERASE_COUNT, blockCnt, 1, 0);
+
+        // Some SD cards want to be deselected between every bus transaction:
+        sd_spi_deselect_pulse(pSD);
+
+        // Multiple block write command
+        if (SD_BLOCK_DEVICE_ERROR_NONE !=
+            (status = sd_cmd(pSD, CMD25_WRITE_MULTIPLE_BLOCK, addr, false, 0))) {
+            return status;
+        }
+
+        while (blockCnt>0) { // write two blocks at a time. if unity pops up in blockCnt remaining, then the second block is not done. 
+
+            // wait for the dma to finish 
+            dma_channel_wait_for_finish_blocking(DMA_CHAN_BUF);
+
+            // trigger DMA to the second half of the buffer immediately 
+            dma_channel_set_write_addr(DMA_CHAN_BUF, (uint8_t*)(buffer + 512), true);
+
+            // do the first buffer half
+            response = sd_write_block(pSD, (uint8_t*)buffer, SPI_START_BLK_MUL_WRITE, _block_size);
+            if (response != SPI_DATA_ACCEPTED) {
+                DBG_PRINTF("Multiple Block Audio Write failed, First Stage: 0x%x\r\n", response);
+                status = SD_BLOCK_DEVICE_ERROR_WRITE;
+                break;
+            }
+
+            blockCnt -= 1;
+
+            if (blockCnt>0) { 
+
+                // wait for the dma to finish 
+                dma_channel_wait_for_finish_blocking(DMA_CHAN_BUF);
+
+                // trigger DMA to the first half of the buffer immediately 
+                dma_channel_set_write_addr(DMA_CHAN_BUF, (uint8_t*)buffer, true);
+
+                // do the second buffer half
+                response = sd_write_block(pSD, (uint8_t*)(buffer + 512), SPI_START_BLK_MUL_WRITE, _block_size);
+
+                if (response != SPI_DATA_ACCEPTED) {
+                    DBG_PRINTF("Multiple Block Audio Write failed, Second Stage: 0x%x\r\n", response);
+                    status = SD_BLOCK_DEVICE_ERROR_WRITE;
+                    break;
+                }
+
+                blockCnt -= 1;
+
+            } else {
+
+                // trigger DMA to the first half of the buffer immediately 
+                dma_channel_set_write_addr(DMA_CHAN_BUF, (uint8_t*)buffer, true);
+
+            }
+
+        }
+
+          // Send all blocks of data 
+        // This "while" will decrement blockCnt once every loop, check if it's non-zero, and if it is nonzero, allow the next loop.
+        /*
+        Example: Three blocks to transfer 
+
+        One loop of response...=/etc runs
+        while(blockCnt=3 -> blockCnt=2 != 0)
+        Another loop = SECOND LOOP
+        while(blockCnt=2 -> blockCnt=1 != 0)
+        Another loop = THIRD LOOP 
+        while(blockCnt=1 -> blockCnt=0 = 0)
+        Do not run the next loop 
+
+        So basically, while (--blockCnt) will take the value of blockCnt, subtract 1, then check if it's zero: if it isn't, another loop!
+        
+        */
+        /* In a Multiple Block write operation, the stop transmission will be
+         * done by sending 'Stop Tran' token instead of 'Start Block' token at
+         * the beginning of the next block
+         */
+        sd_spi_write(pSD, SPI_STOP_TRAN);
+    }
+    uint32_t stat = 0;
+    // Some SD cards want to be deselected between every bus transaction:
+    sd_spi_deselect_pulse(pSD);
+    status = sd_cmd(pSD, CMD13_SEND_STATUS, 0, false, &stat);
+    return status;
+}
+
 
 /** Program blocks to a block device
  *
@@ -1018,6 +1178,17 @@ int sd_write_blocks(sd_card_t *pSD, const uint8_t *buffer,
     TRACE_PRINTF("sd_write_blocks(0x%p, 0x%llx, 0x%lx)\r\n", buffer,
                  ulSectorNumber, blockCnt);
     int status = in_sd_write_blocks(pSD, buffer, ulSectorNumber, blockCnt);
+    sd_release(pSD);
+    return status;
+}
+
+int sd_write_audioblocks(sd_card_t *pSD, const uint8_t *buffer,
+                    uint64_t ulSectorNumber, uint32_t blockCnt,
+                    int32_t DMA_CHAN_BUF) {
+    sd_acquire(pSD);
+    TRACE_PRINTF("sd_write_blocks(0x%p, 0x%llx, 0x%lx)\r\n", buffer,
+                 ulSectorNumber, blockCnt);
+    int status = in_sd_write_audioblocks(pSD, buffer, ulSectorNumber, blockCnt, DMA_CHAN_BUF);
     sd_release(pSD);
     return status;
 }

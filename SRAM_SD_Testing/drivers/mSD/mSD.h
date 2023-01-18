@@ -1,9 +1,6 @@
 #ifndef MSD_H
 #define MSD_H 
 
-#include <stdio.h>
-#include <stdbool.h>
-#include <string.h>
 #include "f_util.h"
 #include "ff.h"
 #include "pico/stdlib.h"
@@ -32,7 +29,8 @@ typedef struct {
 // Check if file exists on SD (returns a bool true/false) 
 bool SD_IS_EXIST(const char *test_filename);
 
-// Do the major gineral test write-read 
-void major_gineral_testwrite(void); 
+// check the write time per cycle in the given configuration for a given number of samples 
+void characterize_SD_write_time(int32_t adc_buf_size_samples);
+
 
 #endif // MSD_H 

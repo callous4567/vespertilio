@@ -2,16 +2,7 @@
 #define MCP4131_SPI
 
 #include "mcp4131_registers.h"
-
-#include <stdio.h>
-#include <string.h>
-#include <stdbool.h>
-#include "pico/stdlib.h"
-#include "pico/binary_info.h"
-#include "hardware/gpio.h"
-#include "malloc.h"
-#include "pico/time.h"
-#include "../Utilities/utils.h"
+#include "hardware/spi.h"
 
 typedef struct {
 

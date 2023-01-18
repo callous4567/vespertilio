@@ -125,26 +125,26 @@ static void write_register(uint8_t reg, uint8_t data) {
     buf[0] = reg & 0x7f;  // remove read bit as this is a write
     buf[1] = data;
     cs_select();
-    sleep_ms(5);
+    busy_wait_ms(5);
     spi_write_blocking(spi0, buf, 2);
     cs_deselect();
-    sleep_ms(5);
+    busy_wait_ms(5);
 
 }
 
-// read the register reg to the buffer (length len uint8_t bytes.) Note that there is a cost of milliseconds here.
+// read the register reg to the buffer (length len uint8_t bytes.) Note that there is a cost of 3-ish milliseconds here.
 static void read_registers(uint8_t reg, uint8_t *buf, uint16_t len) {
     // For this particular device, we send the device the register we want to read
     // first, then subsequently read from the device. The register is auto incrementing
     // so we don't need to keep sending the register we want, just the first.
     reg |= READ_BIT;
     cs_select();
-    sleep_ms(2);
+    busy_wait_ms(1);
     spi_write_blocking(spi0, &reg, 1);
-    sleep_ms(2);
+    busy_wait_ms(1);
     spi_read_blocking(spi0, 0, buf, len);
     cs_deselect();
-    sleep_ms(2);
+    busy_wait_ms(1);
 
 }
 
@@ -313,6 +313,6 @@ void test_bme(void) {
 
         printf("The datastring is...!%s\r\n", datastring);
 
-        sleep_ms(1000);
+        busy_wait_ms(1000);
     }
 }

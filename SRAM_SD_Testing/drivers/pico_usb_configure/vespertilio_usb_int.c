@@ -1,4 +1,12 @@
 #include "vespertilio_usb_int.h"
+#include "../Utilities/utils.h"
+#include "../ext_rtc/ext_rtc.h"
+#include "tusb.h"
+#include "pico/stdio/driver.h"
+#include "pico/stdio_usb.h"
+#include "pico/stdio.h"
+#include "hardware/flash.h"
+#include "hardware/sync.h"
 
 static const int32_t handshake_interval = 100; // milliseconds
 static const int32_t handshake_max_time = 30; // seconds 
@@ -46,7 +54,7 @@ Which we can re-write to
 5) int32_t SECOND;
 6) int32_t MINUTE;
 7) int32_t HOUR;
-8) int32_t DOTW;
+8) int32_t DOTW; // // 1=SUNDAY (Mon = 2, Tues = 3, etc) Pi Pico SDK has 0 to Sunday, so DOTW-1 = Pi pico DOTW
 9) int32_t DOTM;
 10) int32_t MONTH;
 11) int32_t YEAR;
@@ -66,7 +74,7 @@ static inline void flushbuf(void) {
     fflush(stdout);
 
     // can't fflush(stdin) due to undefined behaviour. just force out all chars.
-    for (int i = 0; i < 50; i++) {
+    for (int i = 0; i < 100; i++) {
         getchar_timeout_us(1);
     }
 
@@ -104,7 +112,7 @@ static bool request_configuration(void) {
 
     printf("Configure vespertilio?\r\n"); 
 
-    busy_wait_ms(5); // wait for host to read + send confirm true int32
+    busy_wait_ms(10); // wait for host to read + send confirm true int32
 
     char acknowledged[4];
     fgets(acknowledged, 5, stdin);
@@ -140,8 +148,9 @@ static int32_t* download_configuration(void) {
 
     busy_wait_ms(10);
     printf("Ready to accept...\r\n"); // tell the host we're good to go... 
-    busy_wait_ms(10);
+    busy_wait_ms(20);
     flushbuf();
+    busy_wait_ms(50);
 
     int32_t read_amount = fread(configuration_buffer, 4, CONFIGURATION_BUFFER_TOTAL_SIZE-1, stdin);
     if (read_amount!=CONFIGURATION_BUFFER_TOTAL_SIZE-1) { // we did not read the entire configuration buffer/read failed.
@@ -191,7 +200,7 @@ static void write_to_flash(int32_t* configuration_buffer) {
 }
 
 // return the int32_t CONFIGURATION_BUFFER_SIGNIFICANT_VALUES configuration from the flash as a malloc
-static int32_t* read_from_flash(void) {
+int32_t* read_from_flash(void) {
 
     uint8_t* rawbuf = (uint8_t*)malloc(4*CONFIGURATION_BUFFER_SIGNIFICANT_VALUES);
     for (int i = 0; i < 4*CONFIGURATION_BUFFER_SIGNIFICANT_VALUES; i++) {
@@ -246,29 +255,28 @@ After configuration, the slave can survive a maximum time (subject to the capaci
 bool usb_configurate(void) {
 
     // configure buffers 
-    char stdin_buf[500]; // stdin buffer 500 bytes 
-    char stdout_buf[500]; // stdout buffer 500 bytes
+    char stdin_buf[200]; // stdin buffer 500 bytes 
+    char stdout_buf[200]; // stdout buffer 500 bytes
     setvbuf(stdin, stdin_buf, _IOLBF, sizeof(stdin_buf));
     setvbuf(stdout, stdout_buf, _IOLBF, sizeof(stdout_buf));
 
-    if (handshake()) { // do the handshake. 
+    if (handshake()) { // do the handshake.
 
-        if (request_configuration()) { // get the "true" from the host signifying it is sending data over.
+        if (request_configuration()) { // get the "true" from the host signifying it is sending data over.  takes about 30 ms tops after processing. 
 
-            int32_t* configuration_buffer = download_configuration(); // try to download the configuration 
+            int32_t* configuration_buffer = download_configuration(); // try to download the configuration. about 150-200 ms.
 
             if (*(configuration_buffer+CONFIGURATION_BUFFER_TOTAL_SIZE-1)==(int32_t)1) { // we received the correct number of values 
                 
                 flushbuf();
                 busy_wait_ms(10);
-                fwrite(configuration_buffer, 4, CONFIGURATION_BUFFER_TOTAL_SIZE-1, stdout); // write configuration back to host to verify no corruption 
-
+                fwrite(configuration_buffer, 4, CONFIGURATION_BUFFER_TOTAL_SIZE-1, stdout); // write configuration back to host to verify no corruption
                 char* acknowledgement = (char*)malloc(10*sizeof(char)); // get acknowledgement from host that transfer had no corruption
-                fgets(acknowledgement, 11, stdin); 
+                fgets(acknowledgement, 11, stdin); // waits. you can use fgets to pace the program and wait for the host to confirm.
 
                 if (strcmp(acknowledgement,"Completed.")==0) { // acknowledged true- data isn't corrupted!
 
-                    busy_wait_ms(100);
+                    busy_wait_ms(50);
                     
                     // write to flash the configuration uint8_t*
                     write_to_flash(configuration_buffer);
@@ -306,6 +314,9 @@ bool usb_configurate(void) {
 
             }
 
+            free(configuration_buffer);
+            printf("Failed\r\n.");
+            return false;
         } 
 
     }

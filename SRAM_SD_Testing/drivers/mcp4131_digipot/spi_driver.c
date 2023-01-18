@@ -1,4 +1,9 @@
 #include "spi_driver.h"
+#include "hardware/gpio.h"
+#include "../Utilities/utils.h"
+#include <string.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 // select either potentiometer (pull down)
 void dpot_select(dpot_dual_t* DPOT, int32_t which) {
