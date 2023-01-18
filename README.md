@@ -12,7 +12,7 @@ Every last scrap of code is here, every last design/etc is here, and most import
 - Variable gain on the inverting amplifier w/ fixed gain on the differential for better noise performance 
 - Low-power-standby of ~1mA dormancy when awaiting recording sessions
 - Various passive filters in circuitry to minimize noise, paired with first-order high-pass filter on ADC input
-- Compatible with any/all MicroSD cards (must be Class 10 for 384 kHz performance, though.)
+- Compatible with any/all MicroSD cards ostensibly. Cheap 64GB Sandisk Ultra's can handle the full 499.999 kHz that the Pi Pico ADC can output!
 - Supercapacitor on RTC allows upwards of 15 minutes to exchange batteries without losing timing configuration 
 - Recommend conformal coating Silicone, avoiding ports on BME280 + Winfrey, to increase resilience to environment (sensor needs exposure.)
 
