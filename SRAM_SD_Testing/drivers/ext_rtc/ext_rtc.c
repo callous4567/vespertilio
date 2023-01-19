@@ -146,8 +146,72 @@ static inline uint8_t touint8(uint8_t a) {
     return a;
 }
 
+/*
+READ register ADDRESS to RESULT 
+ADDRESS defined in EXT_RC.H 
+RESULT must be POINTER
+*/
+static void rtc_register_read(
+    ext_rtc_t *EXT_RTC, 
+    uint8_t address, 
+    uint8_t *result,
+    uint8_t len 
+    ) {
+
+    uint8_t* address_ptr;
+    address_ptr = &address;
+
+    int number_written;
+    number_written = i2c_write_blocking(
+        EXT_RTC->hw_inst, 
+        RTC_SLAVE_ADDRESS, 
+        address_ptr, 
+        1,
+        false
+    );
+
+    int number_read;
+    number_read = i2c_read_blocking(
+        EXT_RTC->hw_inst, 
+        RTC_SLAVE_ADDRESS, 
+        result,
+        len,
+        false
+    );
+
+}
+
+/*
+WRITE DATA to ADDRESS. 
+For convenience we haven't required the pre-inclusion of the address in the data,
+Given it is a pointer, we thusly need to allocate on the stack a copy with this included 
+*/
+static void rtc_register_write(
+    ext_rtc_t *EXT_RTC,
+    uint8_t address,
+    uint8_t *data,
+    uint8_t len
+) {
+
+    uint8_t data_buff[len + 1];
+    data_buff[0] = address;
+    for (int i=0; i < len; i++) {
+        data_buff[i+1] = *(data+i);
+    }
+    uint8_t *data_buff_ptr = &data_buff[0];
+
+    i2c_write_blocking(
+        EXT_RTC->hw_inst,
+        RTC_SLAVE_ADDRESS,
+        data_buff_ptr,
+        len+1,
+        false
+    );
+
+}
+
 // Initialize the RTC object default. Returns it. MALLOC!!!!
-ext_rtc_t* init_RTC_default(void) {
+static ext_rtc_t* init_RTC_default(void) {
 
     // set up rtc object 
     ext_rtc_t *EXT_RTC;
@@ -229,7 +293,7 @@ ext_rtc_t* init_RTC_default(void) {
 }
 
 // Set the alarm from the alarmbuf of uint8_ts.
-void rtc_set_alarm1(
+static void rtc_set_alarm1(
     ext_rtc_t *EXT_RTC
 ) {
 
@@ -296,70 +360,6 @@ void rtc_set_alarm1(
 }
 
 /*
-READ register ADDRESS to RESULT 
-ADDRESS defined in EXT_RC.H 
-RESULT must be POINTER
-*/
-void rtc_register_read(
-    ext_rtc_t *EXT_RTC, 
-    uint8_t address, 
-    uint8_t *result,
-    uint8_t len 
-    ) {
-
-    uint8_t* address_ptr;
-    address_ptr = &address;
-
-    int number_written;
-    number_written = i2c_write_blocking(
-        EXT_RTC->hw_inst, 
-        RTC_SLAVE_ADDRESS, 
-        address_ptr, 
-        1,
-        false
-    );
-
-    int number_read;
-    number_read = i2c_read_blocking(
-        EXT_RTC->hw_inst, 
-        RTC_SLAVE_ADDRESS, 
-        result,
-        len,
-        false
-    );
-
-}
-
-/*
-WRITE DATA to ADDRESS. 
-For convenience we haven't required the pre-inclusion of the address in the data,
-Given it is a pointer, we thusly need to allocate on the stack a copy with this included 
-*/
-void rtc_register_write(
-    ext_rtc_t *EXT_RTC,
-    uint8_t address,
-    uint8_t *data,
-    uint8_t len
-) {
-
-    uint8_t data_buff[len + 1];
-    data_buff[0] = address;
-    for (int i=0; i < len; i++) {
-        data_buff[i+1] = *(data+i);
-    }
-    uint8_t *data_buff_ptr = &data_buff[0];
-
-    i2c_write_blocking(
-        EXT_RTC->hw_inst,
-        RTC_SLAVE_ADDRESS,
-        data_buff_ptr,
-        len+1,
-        false
-    );
-
-}
-
-/*
 timebuf is a pointer to a 7-uint8_t-long timeset
 takes the form in the datasheet:
 SECONDS 00:59
@@ -371,7 +371,7 @@ MONTH 01:12
 YEAR 00:99
 note: this form is for the 24-hour-system. there is nonsense for AM/PM too.
 */
-void rtc_set_current_time(
+static void rtc_set_current_time(
     ext_rtc_t *EXT_RTC
 ) {
     
@@ -430,7 +430,7 @@ void rtc_set_current_time(
 }
 
 // Read current time saving to uint8_t timebuf[7]
-void rtc_read_time(
+static void rtc_read_time(
     ext_rtc_t *EXT_RTC
 ) {
 
@@ -497,7 +497,7 @@ void rtc_read_time(
 
 }
 
-// read the current time (to the internal malloc string, which is 22 bytes.)
+// read the current time from RTC, in integer format, to the timestring/fullstring. You do not need to call rtc_read_time before this.
 void rtc_read_string_time(ext_rtc_t *EXT_RTC) {
     /*
     the maximum number of chars/bytes written is...
@@ -511,7 +511,8 @@ void rtc_read_string_time(ext_rtc_t *EXT_RTC) {
     hence 22 bytes 
     */
 
-    
+    rtc_read_time(EXT_RTC);
+
     // USE THIS
     snprintf(
         EXT_RTC->fullstring,
@@ -649,5 +650,36 @@ void update_pico_rtc(ext_rtc_t* EXT_RTC, datetime_t* dtime) {
     dtime->month =   *(EXT_RTC->timebuf + 5)          ; 
     dtime->year  =   *(EXT_RTC->timebuf + 6) + 2000   ; 
     rtc_set_datetime(dtime);
+
+}
+
+// prime the RTC using the configuration_buffer starting after CONFIGURATION_BUFFER_SIGNIFICANT_VALUES using values in order as noted 
+void configure_rtc(int32_t* configuration_buffer, int32_t CONFIGURATION_BUFFER_SIGNIFICANT_VALUES) {
+
+    // init a default RTC object 
+    ext_rtc_t* EXT_RTC = init_RTC_default();
+
+    // set default time 
+    *EXT_RTC->timebuf     = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES);
+    *(EXT_RTC->timebuf+1) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+1);
+    *(EXT_RTC->timebuf+2) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+2);
+    *(EXT_RTC->timebuf+3) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+3);
+    *(EXT_RTC->timebuf+4) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+4);
+    *(EXT_RTC->timebuf+5) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+5);
+    *(EXT_RTC->timebuf+6) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+6);
+    rtc_set_current_time(EXT_RTC);
+
+    // setup default alarm buffer 
+    *EXT_RTC->alarmbuf = 0; // the alarm second is irrelevant to us atm: set to 0 
+    *(EXT_RTC->alarmbuf+1) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+7);; // alarm minute 
+    *(EXT_RTC->alarmbuf+2) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+8);; // alarm hour 
+    *(EXT_RTC->alarmbuf+3) = 1; // the alarm day is irrelevant to use atm: alarm every day
+    rtc_set_alarm1(EXT_RTC);
+
+    // set the RTC on appropriately 
+    rtc_default_status(EXT_RTC);
+
+    // free the RTC
+    rtc_free(EXT_RTC);
 
 }

@@ -46,10 +46,11 @@ int32_t RECORDING_FILE_DATA_SIZE; // total data chunk size in bytes is time * bi
 int32_t RECORDING_NUMBER_OF_CYCLES; // assuming one cycle is two full buffers written + each sample is 2 bytes.
 int32_t RECORDING_NUMBER_OF_FILES; // number of seconds total / seconds per recorded file 
 int32_t BME_RECORD_PERIOD_CYCLES;
+int32_t BME_BUFFER_SIZE; 
 
 // HARDWARE/CONSTANT VARIABLES
 const int32_t ADC_PIN = 26;
-const int32_t ADC_BUF_SIZE = 3072; // two buffers of this size IN SAMPLES. 2048 -> 2048*16 = 32768 bits/32kbits. 
+const int32_t ADC_BUF_SIZE = 3072; // two buffers of this size IN SAMPLES. 2048 -> 2048*16 = 32768 bits/32kbits. Deprecated for recording.c.
 
 
 // set all the functional variables based on the present non-functional variable configuration: call this after redefining, i.e., ADC_SAMPLE_RATE.
@@ -83,6 +84,7 @@ void flash_configurate_variables(void) {
 
     int32_t* configuration_buffer = read_from_flash();
     set_independent_variables(configuration_buffer);
+    USE_BME = true; // force BME 
     set_dependent_variables();
     free(configuration_buffer);
 

@@ -5,5 +5,5 @@
     "START_MINUTE":20,
     "START_HOUR":15,
     "USE_BME":false,
-    "BME_PERIOD_SECONDS":10
+    "BME_PERIOD_SECONDS":5
 }

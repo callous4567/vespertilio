@@ -899,6 +899,7 @@ int sd_read_blocks(sd_card_t *pSD, uint8_t *buffer, uint64_t ulSectorNumber,
 static uint8_t sd_write_block(sd_card_t *pSD, const uint8_t *buffer,
                               uint8_t token, uint32_t length) {
 
+
     uint16_t crc = (~0);
     uint8_t response = 0xFF;
 

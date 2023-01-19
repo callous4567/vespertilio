@@ -36,13 +36,13 @@ dpot_dual_t* init_dpot(void);
 void deinit_dpot(dpot_dual_t* DPOT);
 
 // read the value of the tap to the DPOT 
-void dpot_read_tap(dpot_dual_t* DPOT, int32_t which);
+//void dpot_read_tap(dpot_dual_t* DPOT, int32_t which);
 
 // write the value to the tap
-void dpot_write_tap(dpot_dual_t* DPOT, int32_t which, int32_t value);
+//void dpot_write_tap(dpot_dual_t* DPOT, int32_t which, int32_t value);
 
 // get status register of given DPOT 
-void dpot_read_status(dpot_dual_t* DPOT, int32_t which);
+//void dpot_read_status(dpot_dual_t* DPOT, int32_t which);
 
 // set the gain on the dpot cascade stage 
 void dpot_set_gain(dpot_dual_t* DPOT, int32_t which, int32_t gain);

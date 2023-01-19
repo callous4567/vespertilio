@@ -26,16 +26,14 @@ int main() {
     debug_init_LED();
     stdio_init_all(); 
     //bool success = usb_configurate();
-
     
     flash_configurate_variables(); // configure default from flash.
     dpot_dual_t* DPOT = init_dpot();
-    dpot_set_gain(DPOT, 1, 20);
+    dpot_set_gain(DPOT, 1, 30);
     dpot_set_gain(DPOT, 2, 20);
     deinit_dpot(DPOT);
     run_wav_bme_sequence_single();
     
-
 
 
     /*

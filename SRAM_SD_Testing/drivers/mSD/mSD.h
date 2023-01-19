@@ -26,11 +26,7 @@ typedef struct {
 
 } mSD_struct_t; 
 
-// Check if file exists on SD (returns a bool true/false) 
+// check if file exists on SD (returns a bool true/false) 
 bool SD_IS_EXIST(const char *test_filename);
-
-// check the write time per cycle in the given configuration for a given number of samples 
-void characterize_SD_write_time(int32_t adc_buf_size_samples);
-
 
 #endif // MSD_H 

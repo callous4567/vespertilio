@@ -8,7 +8,7 @@
 #include "hardware/flash.h"
 #include "hardware/sync.h"
 
-static const int32_t handshake_interval = 100; // milliseconds
+static const int32_t handshake_interval = 5; // milliseconds
 static const int32_t handshake_max_time = 30; // seconds 
 static const int32_t handshake_number = handshake_max_time*1000/handshake_interval; // number of handshakes 
 static const int32_t VID = 0x2E8A; // vendor ID + product ID for the Pico UART USB/etc SDK 
@@ -213,37 +213,6 @@ int32_t* read_from_flash(void) {
 
 }
 
-// prime the RTC using the configuration_buffer starting after CONFIGURATION_BUFFER_SIGNIFICANT_VALUES using values in order as noted 
-static void configure_rtc(int32_t* configuration_buffer) {
-
-    // init a default RTC object 
-    ext_rtc_t* EXT_RTC = init_RTC_default();
-
-    // set default time 
-    *EXT_RTC->timebuf     = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES);
-    *(EXT_RTC->timebuf+1) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+1);
-    *(EXT_RTC->timebuf+2) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+2);
-    *(EXT_RTC->timebuf+3) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+3);
-    *(EXT_RTC->timebuf+4) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+4);
-    *(EXT_RTC->timebuf+5) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+5);
-    *(EXT_RTC->timebuf+6) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+6);
-    rtc_set_current_time(EXT_RTC);
-
-    // setup default alarm buffer 
-    *EXT_RTC->alarmbuf = 0; // the alarm second is irrelevant to us atm: set to 0 
-    *(EXT_RTC->alarmbuf+1) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+7);; // alarm minute 
-    *(EXT_RTC->alarmbuf+2) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+8);; // alarm hour 
-    *(EXT_RTC->alarmbuf+3) = 1; // the alarm day is irrelevant to use atm: alarm every day
-    rtc_set_alarm1(EXT_RTC);
-
-    // set the RTC on appropriately 
-    rtc_default_status(EXT_RTC);
-
-    // free the RTC
-    rtc_free(EXT_RTC);
-
-}
-
 /*
 Full USB configuration routine. 
 First plug in the slave pico to the host 
@@ -282,7 +251,7 @@ bool usb_configurate(void) {
                     write_to_flash(configuration_buffer);
 
                     // Next write the RTC configuration 
-                    configure_rtc(configuration_buffer);
+                    configure_rtc(configuration_buffer, CONFIGURATION_BUFFER_SIGNIFICANT_VALUES);
 
                     // host wants this to verify we truly are done and dusted.
                     printf("Flash written 1.\r\n");

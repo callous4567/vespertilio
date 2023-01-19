@@ -334,7 +334,6 @@ static recording_multicore_struct_t* audiostruct_generate(void) {
 static void init_wav_file(recording_multicore_struct_t* multicore_struct) {
 
     // Read the current time + get string 
-    rtc_read_time(multicore_struct->EXT_RTC);
     rtc_read_string_time(multicore_struct->EXT_RTC);
 
     // Generate a string with the time at the front and .wav on the end: fullstring is maximum of 22 bytes, .wav is 4 bytes. 
@@ -402,7 +401,6 @@ static void inline bmetimestring_generate(recording_multicore_struct_t* multicor
     bme_datastring(multicore_struct->BME_DATASTRING);
 
     // also read the RTC to record time with the BME data (22 bytes max)
-    rtc_read_time(multicore_struct->EXT_RTC);
     rtc_read_string_time(multicore_struct->EXT_RTC);
 
     // snprintf what we want.

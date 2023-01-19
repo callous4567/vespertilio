@@ -23,6 +23,7 @@ typedef struct {
 
     // Pointer to the mSD object responsible for this session. mSD->pSD NOT IN MALLOC.
     mSD_struct_t *mSD;
+    bool* active;
 
     // Pointer to the RTC object responsible for this session.
     ext_rtc_t *EXT_RTC;
@@ -35,7 +36,10 @@ typedef struct {
     // BME pointers, too 
     char* BME_DATASTRING;    // bme 20-byte datastring with humidity_pressure_temperature in RH%_pascal_celsius 
     char* BME_AND_TIME_STRING; // 20 byte BME_DATASTRING + the 22 byte EXT_RTC fullstring + a 2-byte "_" spacer + a 1-byte \n newline.
-
+    bool* BME_SHOULD_CONTINUE;
+    bool* BME_SLEEPING; 
+    char* BME_STRINGBUFFER;
+    int32_t* BME_BUFFER_SIZE; 
 
 } recording_multicore_struct_single_t; 
 

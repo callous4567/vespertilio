@@ -197,8 +197,6 @@ def pack_dictionary():
         # see https://docs.python.org/3/library/struct.html#struct-alignment
         # we are packing with the < (little endianness) and i (int 4-byte int32) format
 
-    print("Len of the data string in bytes is ... ", len(stringstruct.decode('UTF-8')))
-
     return stringstruct
 
 

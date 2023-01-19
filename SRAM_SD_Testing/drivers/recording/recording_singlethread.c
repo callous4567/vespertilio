@@ -6,35 +6,16 @@
 #include "pico/multicore.h"
 #include "../bme280/bme280_spi.h"
 
-/*
-Get 6144 sample buffer for the malloc (takes about 10.2 ms to write fully w/ f_write)
-16 ms @ 384 kHz ADC sampling 
-32 @ 192
-64 @ 96
-(approx.)
-Need to have two DMA channels to chain. 
-
-In the case of anything at 192 kHz or below, just start f_write about 3 milliseconds or so before the cycle ends (note that this will depend on frequency as to where you set the second half of the linear buffer to start.) Gives time for the f_write to burn the first few blocks. We can also reduce baudrate for this to reduce timing requirements.
-We do not worry about races here- the SD card will absolutely outpace the ADC, so yeah- easy. The 3 ms is only if you keep the baud at max: if you slow the baud, making it more like 5-10 would work great. Here we are less stringent about the SD card we use- performance isn't necessarily hindered by speed (though should ensure its reasonable.)
-
-In the case of 384 kHz sampling, we need to be more stingent about things. Maximimize baudrate as much as possible. We will be pushing the full 10.2ms write cycle against a 16 ms record cycle. If we pushed to 500 kHz, that's 10.2 ms against 12.28 ms. 
-We need to start the f_write within 5.8 ms of the end, obviously, but should aim for maybe 4-5 ms: this ensures that f_write has set off fully and can write without being outraced.
-We should note that if the SD card is not capable of doing this in 10 ms or less, it should not be used at 384 kHz. That's not technically a limit- we could do it with a 15 ms setup- the timing would just be subject to the whims of the card, which make things more difficult. 
-
-Chain two DMA channels
-Calculate the size of the second start of the buffer (and number of writes necessary, etc, for second half of chain) as (TIME_BEFORE_END/TOTAL_TIME_OF_BUFFER) * BUFFER_SIZE_IN_SAMPLES where TIME_BEFORE_END = 3 ms for most cases. 
-Something like that
-
-Need to account for timing to allow extra function calls, i.e. BME280 data collection, that sort of thing. One BME call takes about 3-4 milliseconds which is a timing nightmare for 384 kHz if you only single-core it. 
-In such a case, I would recommend that multicore is used. 
-
-This is very troublesome- the multicored version is much easier to run. 
+/**
+ * ==================|
+ * THREAD SAFETY NOTE|
+ * ==================|
+ * 
+ * See sd_active_wait/sd_active_done
+ * Need to be used before any and all file writing procedures (f_open/f_close/f_write/f_write_audiobuf/etc)
+ * Otherwise, you will have assertion problems with the SD card.
+ * Due to multicore, this is a necessity: it should not cost much in performance, though.
 */
-
-/*
-initialize the DMA channels and also the buffers we will be using 
-*/
-
 static const int32_t ADC_BLOCKBUF_SIZE = 1024; // two SD card blocks (512 bytes*2.) 
 static const int32_t ADC_BLOCKTRANSFER_SIZE = ADC_BLOCKBUF_SIZE/4; // 256 samples -> 512 bytes -> one block 
 
@@ -217,14 +198,22 @@ static recording_multicore_struct_single_t* audiostruct_generate_single(void) {
     multicore_struct->mSD->fp_audio = (FIL*)malloc(sizeof(FIL));
     multicore_struct->mSD->bw = (UINT*)malloc(sizeof(UINT));
     multicore_struct->mSD->fp_audio_filename = (char*)malloc(26); // 22 bytes for the time fullstring, then 4 bytes for .wav 
+    multicore_struct->active = (bool*)malloc(sizeof(bool));
+    *multicore_struct->active = false;
 
     // Set up pointers for the BME too (and init it.)
     if (USE_BME==true) {
 
-        // Datastring/timestring/init 
+        // Datastring/timestring/init/fullstring/etc
         multicore_struct->BME_DATASTRING = (char*)malloc(20); // 20 bytes for the BME data 
         multicore_struct->BME_AND_TIME_STRING = (char*)malloc(45); // 20 bytes + 22 RTC bytes + 2 byte spacer + 1 byte newline 
-    
+        int32_t BME_BUFFER_SIZE = 45*((RECORDING_LENGTH_SECONDS/BME_RECORD_PERIOD_SECONDS) + 5); // (bytesize of bmetimestring) * (number of BME datapoints per recording + a tolerance)  
+        multicore_struct->BME_STRINGBUFFER = (char*)malloc(BME_BUFFER_SIZE);
+        multicore_struct->BME_SHOULD_CONTINUE = (bool*)malloc(sizeof(bool));
+        multicore_struct->BME_BUFFER_SIZE = (int32_t*)malloc(sizeof(int32_t));
+        *multicore_struct->BME_BUFFER_SIZE = BME_BUFFER_SIZE;
+        multicore_struct->BME_SLEEPING = (bool*)malloc(sizeof(bool));
+
         // The microSD pointers too.
         multicore_struct->mSD->fp_env = (FIL*)malloc(sizeof(FIL));
         multicore_struct->mSD->bw_env = (UINT*)malloc(sizeof(UINT));
@@ -239,11 +228,28 @@ static recording_multicore_struct_single_t* audiostruct_generate_single(void) {
     return multicore_struct;
 }
 
+/**
+ * Wait for the SD card to no longer be "active" under multicore_struct
+ * If it is active, it will wait until it isn't
+ * Once it's inactive, it will set active to true and continue
+ * Use sd_active_done to set active back to false (convenience function)
+ **/
+static void inline sd_active_wait(recording_multicore_struct_single_t* multicore_struct) {
+
+    while (*multicore_struct->active) {
+        busy_wait_us(1);
+    }
+    *multicore_struct->active=true; // set to active 
+
+}
+static void inline sd_active_done(recording_multicore_struct_single_t* multicore_struct) {
+    *multicore_struct->active = false;
+}
+
 // initialize the wav file for the current time taken from the RTC and open it for writing (writing the header.) 
 static void init_wav_file(recording_multicore_struct_single_t* multicore_struct) {
 
     // Read the current time + get string 
-    rtc_read_time(multicore_struct->EXT_RTC);
     rtc_read_string_time(multicore_struct->EXT_RTC);
 
     // Generate a string with the time at the front and .wav on the end: fullstring is maximum of 22 bytes, .wav is 4 bytes. 
@@ -304,95 +310,138 @@ static void init_bme_file(recording_multicore_struct_single_t* multicore_struct)
 
 }
 
-// format/get the BME string
-static void inline bmetimestring_generate(recording_multicore_struct_single_t* multicore_struct) {
+/* initiate a BME file write, pack the buffer, then write it. will reset the buffer, too. */
+static void core1_bme_file(recording_multicore_struct_single_t* multicore_struct) {
 
-    // read the BME datastring (20 bytes max)
-    bme_datastring(multicore_struct->BME_DATASTRING);
+    memset(multicore_struct->BME_STRINGBUFFER, 0, *multicore_struct->BME_BUFFER_SIZE); // reset stringbuf
+    int32_t bytes_written = 0;
+    while (*multicore_struct->BME_SHOULD_CONTINUE) { // gather data for the correct number
 
-    // also read the RTC to record time with the BME data (22 bytes max)
-    rtc_read_time(multicore_struct->EXT_RTC);
-    rtc_read_string_time(multicore_struct->EXT_RTC);
+        *multicore_struct->BME_SLEEPING=false;
 
-    // snprintf what we want.
-    snprintf(
-        multicore_struct->BME_AND_TIME_STRING,
-        45,
-        "%s_%s\n", 
-        multicore_struct->EXT_RTC->fullstring,
-        multicore_struct->BME_DATASTRING
-    );
-    
+        // read the BME datastring (20 bytes max)
+        bme_datastring(multicore_struct->BME_DATASTRING);
+
+        // also read the RTC to record time with the BME data (22 bytes max)
+        rtc_read_string_time(multicore_struct->EXT_RTC);
+
+        // snprintf what we want on to our buffer 
+        snprintf(
+            multicore_struct->BME_STRINGBUFFER + bytes_written,
+            45,
+            "%s_%s\n", 
+            multicore_struct->EXT_RTC->fullstring,
+            multicore_struct->BME_DATASTRING
+        );
+        bytes_written += 45; // iterate the offset for writing, too. 
+        *multicore_struct->mSD->bw_env = bytes_written; // update the number of bytes we have to handle.
+        *multicore_struct->BME_SLEEPING=true;
+        sleep_ms(BME_RECORD_PERIOD_SECONDS*1000 - 5);
+
+    }
+
 }
 
-// write the BME string 
-static void inline bmetimestring_puts(recording_multicore_struct_single_t* multicore_struct) {
+/* Process for core1. 
+Run this at the start of recordings after you have generated the two appropriate files.
+This will create the bme1 file loop and run it indefinitely.
+To terminate, just set BME_SHOULD_CONTINUE to false and them shut down core1/reset it.
+The file loop will launch the first cycle on BME_SHOULD_CONTINUE=true 
+After this, it will do one file until you call BME_SHOULD_CONTINUE=false (then write the file.)
+It will then do another file when BME_SHOULD_CONTINUE is set back to true, and so it loops.
+*/
+static void core1_process(void) {
 
-    // try to write it 
-    int was_it_a_success = f_puts(multicore_struct->BME_AND_TIME_STRING, multicore_struct->mSD->fp_env);
-    if (was_it_a_success<0) {
-        panic("Failed writing BME data to file!!!");
+    recording_multicore_struct_single_t* test_struct = (recording_multicore_struct_single_t*)multicore_fifo_pop_blocking();
+
+    setup_bme(); 
+    uint32_t pacer;
+
+    while (true) { 
+        pacer = (uint32_t)multicore_fifo_pop_blocking(); // wait for the host to say we're good to initialize the file + run
+        *test_struct->BME_SHOULD_CONTINUE=true;
+        core1_bme_file(test_struct);
     }
 
 }
 
 void run_wav_bme_sequence_single(void) {
 
-    // generate the multicore_struct 
-    printf("Generating struct");
-    recording_multicore_struct_single_t* test_struct = audiostruct_generate_single();
+    recording_multicore_struct_single_t* test_struct = audiostruct_generate_single();   // generate the multicore_struct 
+    init_dma_buf(test_struct);  // init the DMA/BUF configuration
 
-    // init the DMA configuration
-    init_dma_buf(test_struct);
-
-    // mount the SD volume
-    printf("Mounting SD card volume.");
+    printf("Mounting SD card volume.");   // mount the SD volume
     FRESULT fr = f_mount(&test_struct->mSD->pSD->fatfs, test_struct->mSD->pSD->pcName, 1); 
     if (FR_OK != fr) panic("f_mount error: %s (%d)\n", FRESULT_str(fr), fr); 
 
-    setup_adc(); // Set up the ADC and the BME if we are to use it. 
-    if (USE_BME==true) { // set up the BME if we're using it
-        setup_bme();
+    setup_adc(); // Set up the ADC 
+
+    rtc_read_string_time(test_struct->EXT_RTC); // read the rtc time 
+    datetime_t* dtime = init_pico_rtc(test_struct->EXT_RTC); // init the pico RTC + configure from the external RTC
+    if (USE_BME) { // launch core1 process.
+        multicore_launch_core1(core1_process);
+        multicore_fifo_push_blocking((uintptr_t)test_struct); // pass over our test_struct 
     }
 
-    rtc_read_time(test_struct->EXT_RTC);
-    datetime_t* dtime = init_pico_rtc(test_struct->EXT_RTC); // init the pico RTC + configure from the external RTC
-
     printf("The number of files is...! %d ... starting recording session.\r\n", RECORDING_NUMBER_OF_FILES);
-    for (int j = 0; j < RECORDING_NUMBER_OF_FILES; j++) {
+    for (int j = 0; j < RECORDING_NUMBER_OF_FILES; j++) { // iterate over number of files 
 
         printf("File number %d\r\n", j);
-        
-        rtc_read_time(test_struct->EXT_RTC);
+
+        rtc_read_string_time(test_struct->EXT_RTC); // read string time 
         update_pico_rtc(test_struct->EXT_RTC, dtime); // update the pico RTC for file writing
 
-        init_wav_file(test_struct);   // initiate the wav file + BME if we are to use it
-        adc_fifo_drain();   // drain fifo 
-        adc_run(true);
-        dma_channel_set_write_addr(*test_struct->ADC_BUFA_CHAN, test_struct->ADC_BUFA, true);    // trigger DMA to the first half of the buffer immediately 
-        f_write_audiobuf(
+        if (USE_BME) {
+            multicore_fifo_push_blocking((uint32_t)1); // pass over an int32 to init a new bme file/etc 
+        }
+
+        sd_active_wait(test_struct);
+        init_wav_file(test_struct);   // initiate the wave file for audio
+        adc_fifo_drain();   // drain fifo
+        adc_run(true);  // run ADC 
+        dma_channel_set_write_addr(*test_struct->ADC_BUFA_CHAN, test_struct->ADC_BUFA, true);   // trigger DMA to the first half of the buffer immediately 
+        f_write_audiobuf( 
             test_struct->mSD->fp_audio,
             test_struct->ADC_BUFA,
             RECORDING_FILE_DATA_SIZE,
             test_struct->mSD->bw,
             *test_struct->ADC_BUFA_CHAN
-        );
-        fr = f_close(test_struct->mSD->fp_audio);
+        ); // and run the ADC file writing
+        adc_run(false); // all done: stop the ADC
+        
+        fr = f_close(test_struct->mSD->fp_audio); // done. write file.
         if (FR_OK != fr) {
             printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
         }
-        if (USE_BME==true) {
+        sd_active_done(test_struct);
+
+        if (USE_BME) { 
+            *test_struct->BME_SHOULD_CONTINUE=false; // stop data gathering. this is set back to true by core1 when we push again.
+            while (!*test_struct->BME_SLEEPING) {
+                busy_wait_us(100);
+            }
+            sd_active_wait(test_struct); 
+            init_bme_file(test_struct); // init the file: we are golden to go 
+            int32_t strings_to_dump = *test_struct->mSD->bw_env/45;
+            for (int k = 0; k < strings_to_dump; k++) {
+                f_puts(test_struct->BME_STRINGBUFFER + 45*k, test_struct->mSD->fp_env);
+            }
+            FRESULT fr;
             fr = f_close(test_struct->mSD->fp_env);
             if (FR_OK != fr) {
                 printf("f_close error environmental: %s (%d)\n", FRESULT_str(fr), fr);
             }
-
+            sd_active_done(test_struct);
+        
         }
 
     }
 
+    if (USE_BME) {
+        busy_wait_ms(1100*BME_RECORD_PERIOD_SECONDS);
+        multicore_reset_core1();
+    }
     f_unmount(test_struct->mSD->pSD->pcName);
-
     printf("Unmounted & Cycles all done baby! Successful recording session.\r\n");
 
 }

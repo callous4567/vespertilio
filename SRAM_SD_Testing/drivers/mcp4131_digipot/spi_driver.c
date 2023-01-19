@@ -93,7 +93,7 @@ the command bits are 00 for writing, 11 for reading.
 you need to read/write simultaneously. 
 note that in writes, the trailing 10-bits of data must be high, i.e. 0bXXXXXX ... 0b1111111111
 */
-void dpot_read_tap(dpot_dual_t* DPOT, int32_t which) {
+static void dpot_read_tap(dpot_dual_t* DPOT, int32_t which) {
 
     // craft our command (wiper address + command bits)
     uint16_t command_dual = (DPOT_WIPER<<12) | 0b0000111111111111; 
@@ -132,7 +132,7 @@ void dpot_read_tap(dpot_dual_t* DPOT, int32_t which) {
 }
 
 // NOTE!!! THE WIPER IS SCALED FROM TERMINAL B, NOT TERMINAL A!!!
-void dpot_write_tap(dpot_dual_t* DPOT, int32_t which, int32_t value) {
+static void dpot_write_tap(dpot_dual_t* DPOT, int32_t which, int32_t value) {
 
     // panic if wiper exceeds max tap
     if (value > max_tap) {
@@ -166,7 +166,7 @@ void dpot_write_tap(dpot_dual_t* DPOT, int32_t which, int32_t value) {
 }
 
 // get status register of given DPOT 
-void dpot_read_status(dpot_dual_t* DPOT, int32_t which) {
+static void dpot_read_status(dpot_dual_t* DPOT, int32_t which) {
 
     // craft our command (wiper address + command bits)
     uint16_t command_dual = (DPOT_STATUS<<12) | 0b0000111111111111; 

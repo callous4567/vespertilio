@@ -10,28 +10,16 @@ include($ENV{PICO_EXTRAS_PATH}/external/pico_extras_import.cmake)
 # Creates a pico-sdk subdirectory in our project for the libraries
 pico_sdk_init()
 
-add_subdirectory(drivers/FatFs_SPI build)
-
 # Set name of project (as PROJECT_NAME) and C/C   standards
-project(SRAM_SD_Testing C CXX ASM)
+project(RTC C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
 # Tell CMake where to find the executable source file
 add_executable(${PROJECT_NAME} 
-    SRAM_SD_Testing.cpp
-    drivers/Utilities/utils.c
-    drivers/Utilities/external_config.c
-    drivers/mSD/mSD.c
-    drivers/mSD/hw_config.c
-    drivers/ext_rtc/ext_rtc_registers.c 
-    drivers/ext_rtc/ext_rtc.c 
-    drivers/recording/recording.c
-    drivers/recording/recording_singlethread.c
-    drivers/mcp4131_digipot/mcp4131_registers.c
-    drivers/mcp4131_digipot/spi_driver.c
-    drivers/bme280/bme280_spi.c
-    drivers/pico_usb_configure/vespertilio_usb_int.c
+    RTC.c
+    ext_rtc.c
+    ext_rtc_registers.c
 )
 
 # Create map/bin/hex/uf2 files
@@ -45,27 +33,20 @@ target_link_libraries(${PROJECT_NAME}
     hardware_spi
     hardware_vreg
     hardware_clocks
+    hardware_rtc
     hardware_adc
     hardware_rtc
     hardware_dma
-    FatFs_SPI
     hardware_i2c
     hardware_sleep
     hardware_rosc
     pico_runtime
     pico_stdio_usb
-    hardware_flash
-    hardware_sync
-    hardware_irq
-    hardware_uart
-    hardware_pio
 )
 
-# Enable UART and USB
+# Enable usb output, disable uart output
 pico_enable_stdio_usb(${PROJECT_NAME} 0)
 pico_enable_stdio_uart(${PROJECT_NAME} 1)
-
-
 
 # COMMAND TO MAKE/BUILD/ETC the Cmake files 
 # cmake -G "MinGW Makefiles" .. 
