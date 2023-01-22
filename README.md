@@ -22,5 +22,15 @@ This is my: first time with C, first time doing anything electrical/circuits/etc
 - Replace Winfrey with Infineon Ultrasonic MEMS when it gets released, which features ultrasonic audio functionality and better performance/SNR/AOP/etc at higher f.
 - Addition of an ambient light sensor to give not 3-parameter, but 4-parameter environmental sensing. 
 
+## Current work
+- Programming USB configuration for recording scheduling (allowing several recording cycles over a night, defaulting to repeat (or not) the next day (or more.)
+- Establishing design plan for moving BME280/BME688 to external module (see Case & Environmental Concept) to make main environmental case waterproof.
+- Designing external 3D case and modifying pre-existing internal design to allow for interconnection.
+- Designing external BME280/BME688 PCB and internal USB-C connector PCB.
+- Cleaning up main body C code and optimization, alongside changing clock settings anticipating 1+ MHz ADC oversampling requirements.
+- Planning for process on characterizing recording capabilities and specification w.r.t directionality, sensitivity, etc.
+- Awaiting delivery of Version 3 PCB, which will be used for in-field testing and establishing if my LTSpice simulations were reasonable.
+
 ![](https://github.com/callous4567/Batcorder/blob/main/VER_1_EX.jpg)
 ^*just the example I'm currently programming on, the first version of the PCB! :D* 
+
