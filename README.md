@@ -21,3 +21,6 @@ This is my: first time with C, first time doing anything electrical/circuits/etc
 - Reduce PCB size to be comparable to other similar devices (this is my first time on the block- cut me some slack.)
 - Replace Winfrey with Infineon Ultrasonic MEMS when it gets released, which features ultrasonic audio functionality and better performance/SNR/AOP/etc at higher f.
 - Addition of an ambient light sensor to give not 3-parameter, but 4-parameter environmental sensing. 
+
+![](https://github.com/callous4567/Batcorder/blob/main/VER_1_EX.png)
+^*just the example I'm currently programming on, the first version of the PCB! :D* 
