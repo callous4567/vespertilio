@@ -135,7 +135,7 @@ static void major_gineral_testwrite(void) {
 /*
 just make a malloc + spam writes to it + measure how long each f_write takes, to the size of our sample buffer (which is adc_buf_size_samples uint16's)
 */
-static void characterize_SD_write_time(int32_t adc_buf_size_samples) {
+void characterize_SD_write_time(int32_t adc_buf_size_samples) {
 
     sd_card_t *pSD = sd_get_by_num(0);
     FRESULT fr = f_mount(&pSD->fatfs, pSD->pcName, 1); 

@@ -27,7 +27,7 @@ void toBinary_16(uint16_t a);
 void debug_init_LED(void);
 
 // Flash the LED pin (x) times 
-void debug_flash_LED(int32_t x);
+void debug_flash_LED(int32_t x, int32_t period);
 
 
 uint8_t* pack_int32_uint8(int32_t* buf, int32_t len);

@@ -50,15 +50,15 @@ void debug_init_LED(void) {
     gpio_put(25, 0);
 }
 
-// Flash the LED pin (x) times 
-void debug_flash_LED(int32_t x) {
+// Flash the LED pin (x) times with a period in milliseconds 
+void debug_flash_LED(int32_t x, int32_t period) {
 
     for (int i = 0; i < x; i++) {
 
-        busy_wait_ms(1000);
         gpio_put(25, 1);
-        busy_wait_ms(1000);
-        gpio_put(25,0);
+        busy_wait_ms(period);
+        gpio_put(25, 0);
+        busy_wait_ms(period);
 
     }
     

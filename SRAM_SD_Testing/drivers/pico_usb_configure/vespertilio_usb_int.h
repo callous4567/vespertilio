@@ -5,7 +5,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-bool usb_configurate(void);
+const extern int32_t CONFIGURATION_BUFFER_INDEPENDENT_VALUES; // for external_config.c
+
+int usb_configurate(void);
 
 int32_t* read_from_flash(void);
 

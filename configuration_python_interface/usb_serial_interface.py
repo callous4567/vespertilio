@@ -4,6 +4,95 @@ import json
 from serial.tools import list_ports
 from serial import Serial
 
+
+"""
+
+XIP_BASE is 0x10000000 and extends from here. XIP_BASE is the zeroth byte of the flash.
+#define PICO_FLASH_SIZE_BYTES (2 * 1024 * 1024) (pico.h)
+#define FLASH_PAGE_SIZE (1u << 8) // program in page sizes (flash.h) ... 256 bytes, i.e. 64 int32_t values. 
+#define FLASH_SECTOR_SIZE (1u << 12) // erase sector sizes (flash.h)
+
+So, a valid flash byte can be found at XIP_BASE all the way to (XIP_BASE + PICO_FLASH_SIZE_BYTES.) 
+No -1... idk why, see https://github.com/raspberrypi/pico-examples/blob/master/flash/program/flash_program.c
+
+So, our process is...
+- Erase the sector located at XIP_BASE + (PICO_FLASH_SIZE_BYTES) - FLASH_SECTOR_SIZE
+- Write the page starting at XIP_BASE + (PICO_FLASH_SIZE_BYTES) - FLASH_SECTOR_SIZE
+
+Which we can re-write to
+- Erase the sector located at XIP_BASE + CONFIG_FLASH_OFFSET
+- Write the page starting at XIP_BASE + CONFIG_FLASH_OFFSET
+
+*/
+
+/*
+
+// // // // These are all the variables we need to retrieve from the host, in order of interpretation, zero-based indices.
+
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES     pertain to values that are static over the session... 
+CONFIGURATION_RTC_INDEPENDENT_VALUES        pertain to values that are dynamic over the session (barring the first 7 values, which defined the initial state of the RTC at configuration.)
+
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES     = 4                                                                                                              // subject to constant change based on features                
+CONFIGURATION_RTC_INDEPENDENT_VALUES        = 7 + 1 + 3*NUMBER_OF_ALARMS                                                                                     // where 7 is the RTC config and 1 is NUMBER_OF_ALARMS 
+CONFIGURATION_BUFFER_TOTAL_SIZE_BYTES       = FOUR BYTES (INT32_T!!!) * [CONFIGURATION_BUFFER_INDEPENDENT_VALUES + CONFIGURATION_RTC_INDEPENDENT_VALUES + 1] // where 1 has been added to account for CONFIG_SUCCESS
+CONFIGURATION_BUFFER_MAX_VARIABLES          = 64                                                                                                             // FLASH_PAGE_SIZE/sizeof(int32_t)
+
+The host should pre-package a total FLASH_PAGE_SIZE=256 bytes=64 int32_t's for us. 
+The forward values should be arranged as below. 
+The end value, CONFIG_SUCCESS, should be set to unity.
+
+// INDEPENDENT VARIABLES FOR RECORDING SPECIFICS: CONFIGURATION_BUFFER_INDEPENDENT_VALUES of them: set recording parameters.
+0)                                                                              int32_t ADC_SAMPLE_RATE = 192000;               
+1)                                                                              int32_t RECORDING_LENGTH_SECONDS = 30;           
+2)                                                                              int32_t USE_BME = true;                         
+3 = CONFIGURATION_BUFFER_INDEPENDENT_VALUES - 1)                                int32_t BME_RECORD_PERIOD_SECONDS = 2;           
+
+// INDEPENDENT TIME VARIABLES- 7 of them. USED BY RTC starting from zero-based index CONFIGURATION_BUFFER_INDEPENDENT_VALUES total of CONFIGURATION_RTC_INDEPENDENT_VALUES
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES)                                        int32_t SECOND;
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES+1)                                      int32_t MINUTE;
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES+2)                                      int32_t HOUR;
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES+3)                                      int32_t DOTW; // // 1=SUNDAY (Mon = 2, Tues = 3, etc) Pi Pico SDK has 0 to Sunday, so DOTW-1 = Pi pico DOTW. See Python conversions which set Monday to 2.
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES+4)                                      int32_t DOTM;
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES+5)                                      int32_t MONTH;
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES+6)                                      int32_t YEAR;
+
+// INDEPENDENT TIME VARIABLES CONTINUED: CUSTOM TIME SCHEDULING FOR THE ALARM! There will be (3N+1) variables here, where the 1 is the "NUMBER_OF_ALARMS." Note that the RECORDING_SESSION_MINUTES must be defined for each alarm. 
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES+7)                                      int32_t NUMBER_OF_SESSIONS;
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES+8)                                      int32_t ALARM_HOUR_1;
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES+9)                                      int32_t ALARM_MIN_1;
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES+10)                                     int32_t RECORDING_SESSION_MINUTES_1;
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES+11)                                     int32_t ALARM_HOUR_2;
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES+12)                                     int32_t ALARM_MIN_2;
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES+13)                                     int32_t RECORDING_SESSION_MINUTES_2;
+:                                                                               int32_t ...
+:                                                                               int32_t ...
+:                                                                               int32_t ...
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES + 7 + 3*WHICH_ALARM_ONEBASED - 2        int32_t ALARM_HOUR_WHICH
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES + 7 + 3*WHICH_ALARM_ONEBASED - 1        int32_t ALARM_MIN_WHICH
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES + 7 + 3*WHICH_ALARM_ONEBASED            int32_t RECORDING_SESSION_MINUTES_WHICH
+:                                                                               int32_t ...
+:                                                                               int32_t ...
+:                                                                               int32_t ...
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES + 7 + 3*NUMBER_OF_ALARMS - 2)           int32_t ALARM_HOUR_NUMBER_OF_ALARMS;
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES + 7 + 3*NUMBER_OF_ALARMS - 1)           int32_t ALARM_MIN_NUMBER_OF_ALARMS;
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES + 7 + 3*NUMBER_OF_ALARMS)               int32_t RECORDING_SESSION_MINUTES_NUMBER_OF_ALARMS;
+
+// Population of zeros
+:                                                                               int32_t host sets to zero
+:                                                                               int32_t ...
+:                                                                               int32_t ...
+:                                                                               int32_t ...
+:                                                                               int32_t host sets to zero
+
+// INDEPENDENT CONFIGURATION BOOL/INT32_T
+CONFIGURATION_BUFFER_MAX_VARIABLES - 1)                                         int32_t CONFIG_SUCCESS // FROM THE HOST! 1 if successful, 0 if else. The end of the flash page/buffer.
+
+
+"""
+
+# create 64-value list object- our FLASH_PAGE_SIZE buffer: 64*int32_t=256.
+
+
 def find_configuration():
     # Write our handshake!
     print("Searching for device...")
@@ -33,9 +122,8 @@ def find_configuration():
 
 
 port = find_configuration()
-print("Opened serial port")
-sert = Serial(port=port.name, baudrate=115200, timeout=3) # timeout is in seconds
-
+sert = Serial(port=port.name, baudrate=230400, timeout=2)  # timeout is in seconds
+print("Found our serial port and opened it!")
 
 def flushbuf():
     sert.flushInput()
@@ -49,6 +137,7 @@ def do_handshake():
     if u == "Configure vespertilio?":
         print("vespertilio has requested configuration. Sending configuration accept.")
     else:
+        print("DEBUG ", u)
         raise ValueError("vespertilio did not ask to be configured. ValueError.")
 
     # pass the slave a true
@@ -57,7 +146,6 @@ def do_handshake():
     print("Sent our acceptance... now we wait for confirmation...")
 
     # Wait for it to accept the true, then check for a thanks!
-    time.sleep(10e-3)
     u = sert.readline().decode('UTF-8').strip()
     print(u)
     if u == "Thanks.":
@@ -68,26 +156,11 @@ def do_handshake():
 
 
 do_handshake()
-print("Handshake completed! Going on to prepare data...")
+print("Handshake completed! Our pico thirsts for the data! Going on to prepare data...")
 time.sleep(5e-3) # sleep 2 milliseconds to allow flushbuf in request_configuration on Pico
 
 
 def prepare_dictionary():
-
-    """
-    .
-    """
-
-    """
-    includes variables (now in a Python dict as a result...)
-    "ADC_SAMPLE_RATE":192000,
-    "RECORDING_MINUTES_PER_SUBRECORDING":5
-    "RECORDING_SESSION_LENGTH_MINUTES":120,
-    "START_MINUTE":20,
-    "START_HOUR":15,
-    "USE_BME":true,
-    "BME_PERIOD_SECONDS":3,
-    """
 
     # Load the JSON file
     with open("vespertilio_config.json", "rb") as f:
@@ -96,10 +169,9 @@ def prepare_dictionary():
     # Make a blank new dict to insert into (dicts are insertion ordered.)
     ordered_dictionary = dict()
 
-    # Insert the recording parameters + BME parameters
+    # INDEPENDENT VARIABLES FOR RECORDING SPECIFICS: CONFIGURATION_BUFFER_INDEPENDENT_VALUES of them: set recording parameters.
     ordered_dictionary['ADC_SAMPLE_RATE'] = json_config['ADC_SAMPLE_RATE']
     ordered_dictionary['RECORDING_LENGTH_SECONDS'] = json_config['RECORDING_MINUTES_PER_SUBRECORDING']*60
-    ordered_dictionary['RECORDING_SESSION_MINUTES'] = json_config['RECORDING_SESSION_LENGTH_MINUTES']
     ordered_dictionary['USE_BME'] = json_config['USE_BME']
     ordered_dictionary['BME_RECORD_PERIOD_SECONDS'] = json_config['BME_PERIOD_SECONDS']
 
@@ -113,7 +185,7 @@ def prepare_dictionary():
     tm_wday [0,6] monday=0 ADD 1, RTC IS [1,7] 
     access via time.localtime().variable 
     """
-    # Get current time + add to our config
+    # INDEPENDENT TIME VARIABLES- 7 of them. USED BY RTC starting from zero-based index CONFIGURATION_BUFFER_INDEPENDENT_VALUES total of CONFIGURATION_RTC_INDEPENDENT_VALUES
     current_time = time.localtime()
     ordered_dictionary['SECOND'] = current_time.tm_sec
     ordered_dictionary['MINUTE'] = current_time.tm_min
@@ -140,55 +212,32 @@ def prepare_dictionary():
     ordered_dictionary['MONTH'] = current_time.tm_mon
     ordered_dictionary['YEAR'] = int(str(current_time.tm_year)[2:4])
 
-    # Finally, add in our alarm times, too
-    ordered_dictionary['ALARM_MIN'] = json_config['START_MINUTE']
-    ordered_dictionary['ALARM_HOUR'] = json_config['START_HOUR']
+    # Now, the NUMBER_OF_SESSIONS
+    ordered_dictionary['NUMBER_OF_SESSIONS'] = json_config['NUMBER_OF_SESSIONS']
+
+    # For each session, ALARM_HOUR_1 ALARM_MIN_1 RECORDING_SESSION_MINUTES_1 up to N
+    for j in range(ordered_dictionary['NUMBER_OF_SESSIONS']):
+        j = j + 1
+        ordered_dictionary["ALARM_HOUR_" + str(j)] = json_config["ALARM_HOUR_" + str(j)]
+        ordered_dictionary["ALARM_MINUTE_" + str(j)] = json_config["ALARM_MINUTE_" + str(j)]
+        ordered_dictionary["RECORDING_SESSION_MINUTES_" + str(j)] = json_config["RECORDING_SESSION_MINUTES_" + str(j)]
+
+    # Now we need to populate this thing all the way up to 256 elements...
+    excess_needed = 64 - len(ordered_dictionary)
+    for k in range(excess_needed):
+        ordered_dictionary['packer_' + str(k)] = False
+        if k == (excess_needed - 1):
+            # CONFIG_SUCCESS is last element and we should set this to true.
+            ordered_dictionary['packer_' + str(k)] = True
 
     return ordered_dictionary
 
 
 dictionary_config = prepare_dictionary()
-print(dictionary_config)
+print("Dictionary prepared...")
+print(len(dictionary_config))
 
 def pack_dictionary():
-
-    """
-
-    Pack the dictionary_config into a bytestring of int32's (int under struct_alignment on the python3 documentation.)
-    This can then be sent to the vespertilio.
-
-    """
-
-    """
-    COPY PASTED FROM THE VESPERTILIO CODEBASE: VESPERTILIO_USB_INT.C UNDER DRIVERS/PICO_USB_CONFIGURE
-
-    /*
-
-    // These are all the variables we need to retrieve from the host, in order of interpretation. 
-
-    // INDEPENDENT VARIABLES (retrieve from host)
-    0) int32_t ADC_SAMPLE_RATE = 192000;
-    1) int32_t RECORDING_LENGTH_SECONDS = 30; // note that BME files are matched to this recording length, too. 
-    2) int32_t RECORDING_SESSION_MINUTES = 1; 
-    3) int32_t USE_BME = true;
-    4) int32_t BME_RECORD_PERIOD_SECONDS = 2;
-
-    // INDEPENDENT TIME VARIABLES (retrieve from host) USED BY RTC 
-    5) int32_t SECOND;
-    6) int32_t MINUTE;
-    7) int32_t HOUR;
-    8) int32_t DOTW; // 1=SUNDAY (Mon = 2, Tues = 3, etc)
-    9) int32_t DOTM;
-    10) int32_t MONTH;
-    11) int32_t YEAR;
-    12) int32_t ALARM_MIN; // alarm second/day-date are irrelevant, we set alarm to go off every day/same time
-    13) int32_t ALARM_HOUR;
-
-    // INDEPENDENT CONFIGURATION BOOL/INT32_T (which is set by the pico- we do not send this from the host!!!)
-    14) int32_t CONFIG_SUCCESS // 1 if successful, 0 if else.
-
-    */
-    """
 
     stringstruct = b''
 
@@ -201,30 +250,25 @@ def pack_dictionary():
 
 
 dictionary_stringstruct = pack_dictionary()
-print("Data prepared...")
+print("Packed dictionary into bytes...")
 
 def send_configuration():
-
-    """
-    Send configuration and check that we have successfully sent it by reading the return "SEIKO!"
-    """
 
     print("Checking to see if Pico is ready to accept...")
 
     u = sert.readline().decode('UTF-8').strip()
 
     if u == "Ready to accept...":
+        print("It is ready to accept! Writing data...")
         pass
     else:
         print(u)
         raise ValueError("Device not ready for configuration... error raised.")
 
-    time.sleep(50e-3)
-
     sert.write(dictionary_stringstruct)
 
     print("Verifying that data sent was correct by reading return...")
-    return_stringstruct = sert.read(80).replace(b'\r', b'')  # 100 bytes max! Confirm this with the firmware.
+    return_stringstruct = sert.read(300).replace(b'\r', b'')  # 100 bytes max! Confirm this with the firmware.
     # We set this to 100 bytes because the pico sends nasty ass \r's.
 
     if dictionary_stringstruct == return_stringstruct:
@@ -257,7 +301,9 @@ send_configuration()
 
 print("Configuration has been successful from our side.")
 print("Check vespertilio to confirm LED flashes.")
-print("You can now disconnect USB.")
+
 for i in range(11):
     print(("Closing in {0}s ...").format(10-i))
     time.sleep(1)
+
+print("Disconnect USB and turn off your vespertilio after doing so! :D")

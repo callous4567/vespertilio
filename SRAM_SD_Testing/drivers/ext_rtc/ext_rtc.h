@@ -39,29 +39,26 @@ typedef struct {
 // read the current time from the rtc to the internal timebuf 
 // void rtc_read_time(ext_rtc_t *EXT_RTC);
 
-// get time formatted as a string instead. MALLOC MUST FREE LATER!
 void rtc_read_string_time(ext_rtc_t *EXT_RTC); 
 
-// helper function to return an example that has an alarm set for 30 seconds after time (for debug testing.) 
 ext_rtc_t* rtc_debug(void);
 
-// dormant sleep until alarm. experimental + troublesome- need to test this extensively. 
+ext_rtc_t* init_RTC_default(void);
+
 void rtc_sleep_until_alarm(ext_rtc_t *EXT_RTC);
 
-// write the default status register just to get the RTC running appropriately 
 void rtc_default_status(ext_rtc_t* EXT_RTC);
 
-// malloc free the RTC 
 void rtc_free(ext_rtc_t* EXT_RTC);
 
-// initiate + update the pi pico intRTC (returns datetime_t object under malloc)
 datetime_t* init_pico_rtc(ext_rtc_t* EXT_RTC);
 
-// update the internal RTC of the pico 
 void update_pico_rtc(ext_rtc_t* EXT_RTC, datetime_t* dtime);
 
-// prime the RTC using the configuration_buffer starting after CONFIGURATION_BUFFER_SIGNIFICANT_VALUES using values in order as noted 
-void configure_rtc(int32_t* configuration_buffer, int32_t CONFIGURATION_BUFFER_SIGNIFICANT_VALUES);
+void configure_rtc(int32_t* configuration_buffer, int32_t CONFIGURATION_BUFFER_INDEPENDENT_VALUES);
 
+void rtc_setsleep_WHICH_ALARM_ONEBASED(int32_t* configuration_buffer, int32_t CONFIGURATION_BUFFER_INDEPENDENT_VALUES, int32_t WHICH_ALARM_ONEBASED);
+
+void alarmtest(void);
 
 #endif /* EXT_RTC_H */

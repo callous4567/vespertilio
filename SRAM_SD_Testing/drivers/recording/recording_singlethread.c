@@ -5,6 +5,8 @@
 #include "../Utilities/external_config.h"
 #include "pico/multicore.h"
 #include "../bme280/bme280_spi.h"
+#include "hardware/adc.h"
+
 
 /**
  * ==================|
@@ -207,11 +209,8 @@ static recording_multicore_struct_single_t* audiostruct_generate_single(void) {
         // Datastring/timestring/init/fullstring/etc
         multicore_struct->BME_DATASTRING = (char*)malloc(20); // 20 bytes for the BME data 
         multicore_struct->BME_AND_TIME_STRING = (char*)malloc(45); // 20 bytes + 22 RTC bytes + 2 byte spacer + 1 byte newline 
-        int32_t BME_BUFFER_SIZE = 45*((RECORDING_LENGTH_SECONDS/BME_RECORD_PERIOD_SECONDS) + 5); // (bytesize of bmetimestring) * (number of BME datapoints per recording + a tolerance)  
         multicore_struct->BME_STRINGBUFFER = (char*)malloc(BME_BUFFER_SIZE);
         multicore_struct->BME_SHOULD_CONTINUE = (bool*)malloc(sizeof(bool));
-        multicore_struct->BME_BUFFER_SIZE = (int32_t*)malloc(sizeof(int32_t));
-        *multicore_struct->BME_BUFFER_SIZE = BME_BUFFER_SIZE;
         multicore_struct->BME_SLEEPING = (bool*)malloc(sizeof(bool));
 
         // The microSD pointers too.
@@ -223,7 +222,10 @@ static recording_multicore_struct_single_t* audiostruct_generate_single(void) {
 
     // Finally let's do the RTC 
     multicore_struct->EXT_RTC = (ext_rtc_t*)malloc(sizeof(ext_rtc_t));
-    multicore_struct->EXT_RTC = rtc_debug();
+    multicore_struct->EXT_RTC = init_RTC_default();
+
+    // Now the DMA chans
+    init_dma_buf(multicore_struct);  // init the DMA/BUF configuration
 
     return multicore_struct;
 }
@@ -313,7 +315,7 @@ static void init_bme_file(recording_multicore_struct_single_t* multicore_struct)
 /* initiate a BME file write, pack the buffer, then write it. will reset the buffer, too. */
 static void core1_bme_file(recording_multicore_struct_single_t* multicore_struct) {
 
-    memset(multicore_struct->BME_STRINGBUFFER, 0, *multicore_struct->BME_BUFFER_SIZE); // reset stringbuf
+    memset(multicore_struct->BME_STRINGBUFFER, 0, BME_BUFFER_SIZE); // reset stringbuf
     int32_t bytes_written = 0;
     while (*multicore_struct->BME_SHOULD_CONTINUE) { // gather data for the correct number
 
@@ -352,23 +354,62 @@ It will then do another file when BME_SHOULD_CONTINUE is set back to true, and s
 */
 static void core1_process(void) {
 
-    recording_multicore_struct_single_t* test_struct = (recording_multicore_struct_single_t*)multicore_fifo_pop_blocking();
+    recording_multicore_struct_single_t* multicore_struct = (recording_multicore_struct_single_t*)multicore_fifo_pop_blocking();
 
     setup_bme(); 
     uint32_t pacer;
 
     while (true) { 
         pacer = (uint32_t)multicore_fifo_pop_blocking(); // wait for the host to say we're good to initialize the file + run
-        *test_struct->BME_SHOULD_CONTINUE=true;
-        core1_bme_file(test_struct);
+        *multicore_struct->BME_SHOULD_CONTINUE=true;
+        core1_bme_file(multicore_struct);
     }
+
+}
+
+
+static void free_audiostruct(recording_multicore_struct_single_t* multicore_struct) {
+
+    // so it begins...
+    free(multicore_struct->mSD->fp_audio);
+    free(multicore_struct->mSD->fp_env);
+    free(multicore_struct->mSD->bw);
+    free(multicore_struct->mSD->bw_env);
+    free(multicore_struct->mSD->fp_audio_filename);
+    free(multicore_struct->mSD->fp_env_filename);
+
+    // and the active...
+    free(multicore_struct->active);
+    
+    // the RTC
+    rtc_free(multicore_struct->EXT_RTC);
+
+    // unclaim the dma channel
+    dma_channel_unclaim(*multicore_struct->ADC_BUFA_CHAN);
+
+    // and free... 
+    free(multicore_struct->ADC_BUFA);
+    free(multicore_struct->ADC_BUFA_CHAN);
+    free(multicore_struct->ADC_BUFA_CONF);
+
+    // if the BME exists
+    if (USE_BME) {
+
+        free(multicore_struct->BME_DATASTRING);
+        free(multicore_struct->BME_AND_TIME_STRING);
+        free(multicore_struct->BME_SHOULD_CONTINUE);
+        free(multicore_struct->BME_SLEEPING);
+        free(multicore_struct->BME_STRINGBUFFER);
+
+    }
+
+    // that should be it... I hope...
 
 }
 
 void run_wav_bme_sequence_single(void) {
 
     recording_multicore_struct_single_t* test_struct = audiostruct_generate_single();   // generate the multicore_struct 
-    init_dma_buf(test_struct);  // init the DMA/BUF configuration
 
     printf("Mounting SD card volume.");   // mount the SD volume
     FRESULT fr = f_mount(&test_struct->mSD->pSD->fatfs, test_struct->mSD->pSD->pcName, 1); 
@@ -443,5 +484,11 @@ void run_wav_bme_sequence_single(void) {
     }
     f_unmount(test_struct->mSD->pSD->pcName);
     printf("Unmounted & Cycles all done baby! Successful recording session.\r\n");
+
+    // free the test struct
+    free_audiostruct(test_struct);
+
+    // and the time
+    free(dtime);
 
 }

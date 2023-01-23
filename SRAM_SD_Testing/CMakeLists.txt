@@ -26,7 +26,6 @@ add_executable(${PROJECT_NAME}
     drivers/mSD/hw_config.c
     drivers/ext_rtc/ext_rtc_registers.c 
     drivers/ext_rtc/ext_rtc.c 
-    drivers/recording/recording.c
     drivers/recording/recording_singlethread.c
     drivers/mcp4131_digipot/mcp4131_registers.c
     drivers/mcp4131_digipot/spi_driver.c

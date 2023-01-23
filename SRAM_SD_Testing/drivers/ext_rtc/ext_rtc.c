@@ -13,7 +13,7 @@
 // free the rtc
 void rtc_free(ext_rtc_t* EXT_RTC) {
 
-    free(EXT_RTC->hw_inst);
+    i2c_deinit(EXT_RTC->hw_inst); // deinit the i2c instance (v. important.)
     free(EXT_RTC->timebuf);
     free(EXT_RTC->alarmbuf);
     free(EXT_RTC->fullstring);
@@ -211,7 +211,7 @@ static void rtc_register_write(
 }
 
 // Initialize the RTC object default. Returns it. MALLOC!!!!
-static ext_rtc_t* init_RTC_default(void) {
+ext_rtc_t* init_RTC_default(void) {
 
     // set up rtc object 
     ext_rtc_t *EXT_RTC;
@@ -232,9 +232,10 @@ static ext_rtc_t* init_RTC_default(void) {
     gpio_set_function(EXT_RTC->sda, GPIO_FUNC_I2C);
     gpio_set_function(EXT_RTC->scl, GPIO_FUNC_I2C);
 
-    // disable internal pulls. 
+    // set internal pulls (REV 4 requires this since we do not do the external pullups.) TODO VER 4: Pullup bank to a GPIO w/ 10K pullups. Internals aren't enough.
     gpio_set_pulls(RTC_SDA_PIN, false, false);
     gpio_set_pulls(RTC_SCK_PIN, false, false);
+    gpio_set_pulls(RTC_INT_PIN, false, false);
 
     // malloc up the timebuf too (7 bytes. See datasheet top-down of registers.)
     EXT_RTC->timebuf = (uint8_t*)malloc(7);
@@ -248,13 +249,13 @@ static ext_rtc_t* init_RTC_default(void) {
     BIT
     7: set to 0 to start oscillator
     6: n/a
-    5: whether to interrupt when we ran out of battery juice
+    5: whether to interrupt when we ran out of battery juice: set t0 
     4-3: Square-wave alarm frequency. 
     2: Whether we enable the alarm activation- we want to. Set to 1.
     1: Set to 1 to enable alarm 2
     0: Set to 1 to enable alarm 2. We only need alarm 1 though so set to 0.
     */
-    uint8_t RTC_DEFAULT_CONTROL = 0b00111101;
+    uint8_t RTC_DEFAULT_CONTROL = 0b00011101;
     uint8_t *RTC_DEFAULT_CONTROL_ptr = &RTC_DEFAULT_CONTROL;
 
     // write our new register
@@ -286,6 +287,9 @@ static ext_rtc_t* init_RTC_default(void) {
 
     // The internal fullstring too
     EXT_RTC->fullstring = (char*)malloc(22);
+
+    // default status
+    rtc_default_status(EXT_RTC);
 
     // return the malloc'd pointer :)
     return EXT_RTC;
@@ -569,8 +573,10 @@ void rtc_sleep_until_alarm(ext_rtc_t *EXT_RTC) {
     //uart_default_tx_wait_blocking();
 
     // go to sleep + then wait until dormant.
+    printf("Doing ROSC sleep\r\n");
     sleep_run_from_rosc();
     sleep_goto_dormant_until_pin(EXT_RTC->ext_int, true, false);
+    printf("Recovering...\r\n");
     recover_from_sleep(scb_orig, clock0_orig, clock1_orig);
 
     // Wait for the fifo to be drained so we get reliable output
@@ -593,12 +599,12 @@ void rtc_default_status(ext_rtc_t* EXT_RTC) {
 
 }
 
-// just generates a conveniently programmed RTC for debugging purposes (malloc'd obviously/etc.)
+// just generates a conveniently programmed RTC for debugging purposes (malloc'd obviously/etc.) Alarm 15 seconds after init.
 ext_rtc_t* rtc_debug(void) {
     
     ext_rtc_t *EXT_RTC = init_RTC_default();
 
-    /*
+    
     *EXT_RTC->alarmbuf = 15;
     *(EXT_RTC->alarmbuf+1) = 0;
     *(EXT_RTC->alarmbuf+2) = 1;
@@ -613,8 +619,7 @@ ext_rtc_t* rtc_debug(void) {
     *(EXT_RTC->timebuf+5) = 1;
     *(EXT_RTC->timebuf+6) = 0;
     rtc_set_current_time(EXT_RTC);
-    */
-
+    
     // Write the status register default 
     rtc_default_status(EXT_RTC);
 
@@ -622,7 +627,7 @@ ext_rtc_t* rtc_debug(void) {
 
 }
 
-// will initialize the internal RTC and set it to the internal time of the provided ext_rtc_t. you need to set the ext_rtc time first.
+// will initialize the internal RTC and set it to the internal time of the provided ext_rtc_t. you need to set the ext_rtc time first. returns a malloc.
 datetime_t* init_pico_rtc(ext_rtc_t* EXT_RTC) {
 
     rtc_init();
@@ -653,28 +658,21 @@ void update_pico_rtc(ext_rtc_t* EXT_RTC, datetime_t* dtime) {
 
 }
 
-// prime the RTC using the configuration_buffer starting after CONFIGURATION_BUFFER_SIGNIFICANT_VALUES using values in order as noted 
-void configure_rtc(int32_t* configuration_buffer, int32_t CONFIGURATION_BUFFER_SIGNIFICANT_VALUES) {
+/* set default time to RTC from buffer. specific to use in USB implementation. creates and frees an EXT_RTC.*/
+void configure_rtc(int32_t* configuration_buffer, int32_t CONFIGURATION_BUFFER_INDEPENDENT_VALUES) {
 
     // init a default RTC object 
     ext_rtc_t* EXT_RTC = init_RTC_default();
 
     // set default time 
-    *EXT_RTC->timebuf     = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES);
-    *(EXT_RTC->timebuf+1) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+1);
-    *(EXT_RTC->timebuf+2) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+2);
-    *(EXT_RTC->timebuf+3) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+3);
-    *(EXT_RTC->timebuf+4) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+4);
-    *(EXT_RTC->timebuf+5) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+5);
-    *(EXT_RTC->timebuf+6) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+6);
+    *EXT_RTC->timebuf     = *(configuration_buffer+CONFIGURATION_BUFFER_INDEPENDENT_VALUES);
+    *(EXT_RTC->timebuf+1) = *(configuration_buffer+CONFIGURATION_BUFFER_INDEPENDENT_VALUES+1);
+    *(EXT_RTC->timebuf+2) = *(configuration_buffer+CONFIGURATION_BUFFER_INDEPENDENT_VALUES+2);
+    *(EXT_RTC->timebuf+3) = *(configuration_buffer+CONFIGURATION_BUFFER_INDEPENDENT_VALUES+3);
+    *(EXT_RTC->timebuf+4) = *(configuration_buffer+CONFIGURATION_BUFFER_INDEPENDENT_VALUES+4);
+    *(EXT_RTC->timebuf+5) = *(configuration_buffer+CONFIGURATION_BUFFER_INDEPENDENT_VALUES+5);
+    *(EXT_RTC->timebuf+6) = *(configuration_buffer+CONFIGURATION_BUFFER_INDEPENDENT_VALUES+6);
     rtc_set_current_time(EXT_RTC);
-
-    // setup default alarm buffer 
-    *EXT_RTC->alarmbuf = 0; // the alarm second is irrelevant to us atm: set to 0 
-    *(EXT_RTC->alarmbuf+1) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+7);; // alarm minute 
-    *(EXT_RTC->alarmbuf+2) = *(configuration_buffer+CONFIGURATION_BUFFER_SIGNIFICANT_VALUES+8);; // alarm hour 
-    *(EXT_RTC->alarmbuf+3) = 1; // the alarm day is irrelevant to use atm: alarm every day
-    rtc_set_alarm1(EXT_RTC);
 
     // set the RTC on appropriately 
     rtc_default_status(EXT_RTC);
@@ -683,3 +681,49 @@ void configure_rtc(int32_t* configuration_buffer, int32_t CONFIGURATION_BUFFER_S
     rtc_free(EXT_RTC);
 
 }
+
+/**
+ * Set the alarm for EXT_RTC following the usual format from the USB configurator for the given WHICH_ALARM_ONEBASED from the provided configuration_buffer
+ * Will set alarm, then enter dormancy until the alarm goes off. 
+ * After waking up, will free the internal EXT_RTC.
+ * Note that this self-disables the digital assembly. 
+ * **/
+void rtc_setsleep_WHICH_ALARM_ONEBASED(int32_t* configuration_buffer, int32_t CONFIGURATION_BUFFER_INDEPENDENT_VALUES, int32_t WHICH_ALARM_ONEBASED) {
+
+    // init a default RTC object 
+    ext_rtc_t* EXT_RTC = init_RTC_default();
+
+    *EXT_RTC->alarmbuf = 0; // always set second to zero so who cares 
+    *(EXT_RTC->alarmbuf+1) = *(configuration_buffer + CONFIGURATION_BUFFER_INDEPENDENT_VALUES + 7 + (3*WHICH_ALARM_ONEBASED) - 1); // the minute
+    *(EXT_RTC->alarmbuf+2) = *(configuration_buffer + CONFIGURATION_BUFFER_INDEPENDENT_VALUES + 7 + (3*WHICH_ALARM_ONEBASED) - 2); // the hour 
+    *(EXT_RTC->alarmbuf+3) = 1; // repeat every day, hence irrelevant  
+    rtc_set_alarm1(EXT_RTC);
+
+    // set the RTC on appropriately 
+    rtc_default_status(EXT_RTC);
+
+    // sleep + then wake up
+    rtc_sleep_until_alarm(EXT_RTC);
+
+    // we're awake! free the RTC and continue.
+    rtc_free(EXT_RTC);
+
+}
+
+void alarmtest(void) {
+
+    printf("Generating ext rtc\r\n");
+    ext_rtc_t* EXT_RTC = rtc_debug();
+    printf("Sleeping\r\n");
+    rtc_sleep_until_alarm(EXT_RTC);
+    printf("Woke up.\r\n");
+
+}
+
+
+/* FOR THE ALARMS NOTE SOME THINGS
+- change code to account for internal pullups on all the lines- DONE 
+- this will mean that we are independent from the digital powerline/etc entirely
+- note DO NOT CONNECT on ver. 3 of the PCB for these pullups.
+This is necessary to ensure we do not need to deal with digi at all when it comes to the RTC.
+*/

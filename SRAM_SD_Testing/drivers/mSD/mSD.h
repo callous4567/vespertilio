@@ -29,4 +29,5 @@ typedef struct {
 // check if file exists on SD (returns a bool true/false) 
 bool SD_IS_EXIST(const char *test_filename);
 
+void characterize_SD_write_time(int32_t adc_buf_size_samples);
 #endif // MSD_H 
