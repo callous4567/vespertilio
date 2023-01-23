@@ -154,12 +154,13 @@ static bool request_configuration(void) {
 
     busy_wait_ms(1); // wait for host to read + send confirm true int32
 
-    char acknowledged[4];
+    char* acknowledged = (char*)malloc(4*sizeof(char));
     fgets(acknowledged, 5, stdin);
     busy_wait_ms(1);
 
     if (strcmp(acknowledged, "true")==0) { // host "true" matches our "true" + we can continue configuration. double check though with host..
         
+        free(acknowledged);
         busy_wait_ms(1);
         printf("Thanks.\r\n");
         busy_wait_ms(19);
@@ -169,6 +170,7 @@ static bool request_configuration(void) {
 
     } else { // doesn't match: host did not give us a "true." Pass a "false" at this point to flag configuration failure. 
 
+        free(acknowledged);
         return false;
 
     }
@@ -315,7 +317,6 @@ int usb_configurate(void) {
             }
 
             free(configuration_buffer);
-            printf("Failed\r\n.");
             return false;
 
         } else {
