@@ -30,6 +30,7 @@ This is my: first time with C, first time doing anything electrical/circuits/etc
 - Cleaning up main body C code and optimization, alongside changing clock settings anticipating 1+ MHz ADC oversampling requirements.
 - Planning for process on characterizing recording capabilities and specification w.r.t directionality, sensitivity, etc.
 - Awaiting delivery of Version 3 PCB, which will be used for in-field testing and establishing if my LTSpice simulations were reasonable.
+- Characterizing power usage. Currently uses about 30 mA at 192 kHz recording, 50-60 mA at 480 kHz recording.
 
 ![](https://github.com/callous4567/Batcorder/blob/main/VER_1_EX.jpg)
 ^*just the example I'm currently programming on, the first version of the PCB! :D* 
