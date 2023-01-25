@@ -1,7 +1,0 @@
-The specifications for the MAX8510 specify a logic high level 2V<SHDN<6V. This matches the specification on the input voltage range. It also specifies that for normal operation, SHDN should be shorted to VIN (i.e. logic high matches the input voltage of the regulator, obviously high for correct use.) 
-
-Will the MAX8510 function correctly if SHDN logic high level is kept within 2V<SHDN<6V but not necessarily equal to the input voltage (i.e. less than, specifically)? 
-
-I ask this because I have a use case where the MCU can only output 3V3 on a GPIO rail and I intend to use this to control several regulators (8510's at the moment.) The input/battery voltage can push as high as 5V, 1.7V beyond the logic high level that I am able to directly apply without requiring some sort of inbetween MOSFET to control a different logic high source. The current prototype makes use of the 3V3 GPIO directly on the SHDN pin but with 3V3 applied, the 8510 outputs 2.4V (below the 3V3 fixed-value it should output.) If I set the SHDN pin to the battery input manually, I get 3V3 out of the regulator. 
-
-Thank you!
