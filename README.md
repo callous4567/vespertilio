@@ -3,7 +3,7 @@
 ## General description 
 A mid-spec battery-powered bat-recorder with an environmental sensor on the board, featuring the BME280 and Knowles Winfrey paired with a Pi Pico, with low-loss parts! Hopefully it'll be a great bat recording device! Hopefully!
 
-This is my: first time with C, first time doing anything electrical/circuits/etc, and one of my first times modelling anything in 3D. Also my first time with PCBs. Thusly, do not expect anything magical- this is all a work-in-progress to make something that performs exceptionally well for bats with exceptional modifiability for the average hobbyist (see: me.) ***This page is extremely WIP, by the way. Most code here will not work- note how there are no "releases"!*** The only working build at the moment is local to me since I am just testing features in situ before slapping 'em all together.
+This is my first time with C (embedded or otherwise) and with a bunch of other things- PCBs, electronics, 3D cases, so you will have to bare with me whilst I work through this project bit by bit 😅
 
 ## Features/Hardware 
 - BME280 for Environmental Sensing (Temp, Pressure, Humidity)
@@ -19,11 +19,10 @@ This is my: first time with C, first time doing anything electrical/circuits/etc
 - External ADC rather than RP2040 ADC, giving 14/16-bit instead of 12-bit at 1 MHz. Aiming to integrate a MCP33151/41-XX, specifically, or something similarly specced. 1 Mhz -> 5x oversampling @ 192 kHz, 10x oversampling @ 96 kHz. Would improve noise performance, as ADC measurements carried out isolated from internals of RP2040 (SPI line exception.)
 - Transfer BME280 to secondary PCB with wire connector through waterproof case (at moment, need case with hole on bottom) to maximize damage safety, and replace with the BME688 to allow for air quality to also be obtained- the AI module may prove useful. 
 - Reduce PCB size to be comparable to other similar devices (this is my first time on the block- cut me some slack.)
-- Replace Winfrey with Infineon Ultrasonic MEMS when it gets released, which features ultrasonic audio functionality and better performance/SNR/AOP/etc at higher f.
-- Addition of an ambient light sensor to give not 3-parameter, but 4-parameter environmental sensing. 
+- Replace Winfrey with Infineon Ultrasonic MEMS when it gets released, which features ultrasonic speaker functionality and better performance/SNR/AOP/etc at higher f.
+- Addition of an ambient light sensor to give not 3-parameter, but 4-parameter environmental sensing.
 
 ## Current work
-- Programming USB configuration for recording scheduling (allowing several recording cycles over a night, defaulting to repeat (or not) the next day (or more.)
 - Establishing design plan for moving BME280/BME688 to external module (see Case & Environmental Concept) to make main environmental case waterproof.
 - Designing external 3D case and modifying pre-existing internal design to allow for interconnection.
 - Designing external BME280/BME688 PCB and internal USB-C connector PCB.
