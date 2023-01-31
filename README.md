@@ -23,14 +23,12 @@ This is my first time with C (embedded or otherwise) and with a bunch of other t
 - Addition of an ambient light sensor to give not 3-parameter, but 4-parameter environmental sensing.
 
 ## Current work
-- Establishing design plan for moving BME280/BME688 to external module (see Case & Environmental Concept) to make main environmental case waterproof.
-- Designing external 3D case and modifying pre-existing internal design to allow for interconnection.
-- Designing external BME280/BME688 PCB and internal USB-C connector PCB.
+- Modifying 3D waterproof case designs to accommodate current design, including adding port for weather sensor option.
 - Cleaning up main body C code and optimization, alongside changing clock settings anticipating 1+ MHz ADC oversampling requirements.
 - Planning for process on characterizing recording capabilities and specification w.r.t directionality, sensitivity, etc.
-- Awaiting delivery of Version 3 PCB, which will be used for in-field testing and establishing if my LTSpice simulations were reasonable.
 - Characterizing power usage. Currently uses about 30 mA at 192 kHz recording, 50-60 mA at 480 kHz recording.
 
-![](https://github.com/callous4567/Batcorder/blob/main/VER_1_EX.jpg)
-^*just the example I'm currently programming on, the first version of the PCB! :D* 
-
+![](https://github.com/callous4567/Batcorder/blob/main/VER_3_EX.jpg)
+^*just the example I'm currently programming on, the third version of the PCB! The strange orange glob is a ball of kapton tape encasing a MAX8510, testing the disabling & desoldering/removal of the onboard DC-DC converter of the Pi Pico to improve noise performance (just disabling it isn't enough- you have to remove it completely for it to be extra effective. It works great, btw!*
+![](https://github.com/callous4567/vespertilio/blob/main/current_pcbs.jpg)
+^*The current spread of PCBS. The leftmost is the main body, the right two provide the optional weather sensor module (attached to the otherwise-waterproof, then weatherproof, case.*
