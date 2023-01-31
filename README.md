@@ -16,11 +16,8 @@ This is my first time with C (embedded or otherwise) and with a bunch of other t
 - Recommend conformal coating Silicone, avoiding ports on BME280 + Winfrey, to increase resilience to environment (sensor needs exposure.)
 
 ## Planned Hardware Features
-- External ADC rather than RP2040 ADC, giving 14/16-bit instead of 12-bit at 1 MHz. Aiming to integrate a MCP33151/41-XX, specifically, or something similarly specced. 1 Mhz -> 5x oversampling @ 192 kHz, 10x oversampling @ 96 kHz. Would improve noise performance, as ADC measurements carried out isolated from internals of RP2040 (SPI line exception.)
-- Transfer BME280 to secondary PCB with wire connector through waterproof case (at moment, need case with hole on bottom) to maximize damage safety, and replace with the BME688 to allow for air quality to also be obtained- the AI module may prove useful. 
-- Reduce PCB size to be comparable to other similar devices (this is my first time on the block- cut me some slack.)
 - Replace Winfrey with Infineon Ultrasonic MEMS when it gets released, which features ultrasonic speaker functionality and better performance/SNR/AOP/etc at higher f.
-- Addition of an ambient light sensor to give not 3-parameter, but 4-parameter environmental sensing.
+- External ADC rather than RP2040 ADC, giving 14/16-bit instead of 12-bit at 1 MHz. Aiming to integrate a MCP33151/41-XX, specifically, or something similarly specced. 1 Mhz -> 5x oversampling @ 192 kHz, 10x oversampling @ 96 kHz. Would improve noise performance, as ADC measurements carried out isolated from internals of RP2040 (SPI line exception.) This will be a very late WIP project- I haven't tested whether the performance of the onboard ADC is good enough yet to warrant upgrading from it. 
 
 ## Current work
 - Modifying 3D waterproof case designs to accommodate current design, including adding port for weather sensor option.
@@ -31,4 +28,4 @@ This is my first time with C (embedded or otherwise) and with a bunch of other t
 ![](https://github.com/callous4567/Batcorder/blob/main/VER_3_EX.jpg)
 ^*just the example I'm currently programming on, the third version of the PCB! The strange orange glob is a ball of kapton tape encasing a MAX8510, testing the disabling & desoldering/removal of the onboard DC-DC converter of the Pi Pico to improve noise performance (just disabling it isn't enough- you have to remove it completely for it to be extra effective. It works great, btw!*
 ![](https://github.com/callous4567/vespertilio/blob/main/current_pcbs.jpg)
-^*The current spread of PCBS. The leftmost is the main body, the right two provide the optional weather sensor module (attached to the otherwise-waterproof, then weatherproof, case.*
+^*The current spread of PCBS as of Version 4, currently WIP. The leftmost is the main body, the right two provide the optional weather sensor module (attached to the otherwise-waterproof, then weatherproof, case. You can note the addition of that ambient light sensor I mentioned, the externalization of the weather sensor, and various other things I previously promised! Though you'll have to wait for me to program everything- the PCB is a WIP, nevermind getting a working version here for me to work on.*
