@@ -33,4 +33,5 @@ This is my first time with C (embedded or otherwise) and with a bunch of other t
 
 ![](https://github.com/callous4567/Batcorder/blob/main/VER_1_EX.jpg)
 ^*just the example I'm currently programming on, the first version of the PCB! :D* 
-
+![](https://github.com/callous4567/vespertilio/blob/main/current_pcbs.jpg)
+^*The current spread of PCBS. The leftmost is the main body, the right two provide the optional weather sensor module (attached to the otherwise-waterproof, then weatherproof, case.*
