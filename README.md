@@ -10,19 +10,19 @@ This is my first time with C (embedded or otherwise) and with a bunch of other t
 - Knowles Winfrey Microphone with Differential Amplifier -> Inverting Amplifier Cascade for audio (giving single-ended-equivalent gains minimum 220+!)
 - Variable gain on the inverting amplifier w/ fixed gain on the differential for better noise performance 
 - Low-power-standby of ~1mA dormancy when awaiting recording sessions (digital assembly and analogue disabled during standby.)
-- Compatible with any/all MicroSD cards ostensibly. Cheap 64GB Sandisk Ultra's can handle the full 499.999 kHz that the Pi Pico ADC can output!
+- Compatible with usual MicroSD cards- Sandisk has been tested (16GB, 32GB, 64GB Ultra) to work fine at 480 kHz.
 - Supercapacitor on RTC allows upwards of 15 minutes to exchange batteries without losing timing configuration- no need to reconfigure after re-batterying... battery-re.. whatever!
-- **WIP**, provided case designs can be 3D printed appropriately to provide waterproofing (or weatherproofing in case of use of weather sensor addon) of the vespertilio 
+- Competetive BOM cost: roughly £40 as of Ver 4 without the weather sensor addon, which adds about £10 to the final cost.
+- **WIP**, provided case designs can be 3D printed appropriately to provide waterproof (weatherproof with weather sensor- it compromises the waterproof seal) sealed case for the device, allowing use in all usual environments 
 
-## Planned Hardware Features
-- Replace Winfrey with Infineon Ultrasonic MEMS when it gets released, which features ultrasonic speaker functionality and better performance/SNR/AOP/etc at higher f.
-- External ADC rather than RP2040 ADC, giving 14/16-bit instead of 12-bit at 1 MHz. Aiming to integrate a MCP33151/41-XX, specifically, or something similarly specced. 1 Mhz -> 5x oversampling @ 192 kHz, 10x oversampling @ 96 kHz. Would improve noise performance, as ADC measurements carried out isolated from internals of RP2040 (SPI line exception.) This will be a very late WIP project- I haven't tested whether the performance of the onboard ADC is good enough yet to warrant upgrading from it. 
+
 
 ## Current work
-- Modifying 3D waterproof case designs to accommodate current design, including adding port for weather sensor option.
-- Cleaning up main body C code and optimization, alongside changing clock settings anticipating 1+ MHz ADC oversampling requirements.
-- Planning for process on characterizing recording capabilities and specification w.r.t directionality, sensitivity, etc.
-- Characterizing power usage. Currently uses about 30 mA at 192 kHz recording, 50-60 mA at 480 kHz recording.
+- Designing 3D weatherproof casings for vespertilio, BME attachment, and BME USB-SPI interface. *The concept is done- just need time to modify current designs.*
+- Cleaning up main body C code and optimization, alongside changing clock settings anticipating 1+ MHz ADC oversampling requirements. *Need time.*
+- Planning for process on characterizing recording capabilities and specification w.r.t directionality, sensitivity, etc. *Need bats, an ultrasonic audio source, and somewhere quiet.*
+
+
 
 ![](https://github.com/callous4567/Batcorder/blob/main/VER_3_EX.jpg)
 ^*just the example I'm currently programming on, the third version of the PCB! The strange orange glob is a ball of kapton tape encasing a MAX8510, testing the disabling & desoldering/removal of the onboard DC-DC converter of the Pi Pico to improve noise performance (just disabling it isn't enough- you have to remove it completely for it to be extra effective. It works great, btw!*
