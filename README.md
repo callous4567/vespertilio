@@ -1,26 +1,22 @@
 ![](https://github.com/callous4567/Batcorder/blob/main/design_bat.png)
 
 ## General description 
-A mid-spec battery-powered bat-recorder with an environmental sensor on the board, featuring the BME280 and Knowles Winfrey paired with a Pi Pico, with low-loss parts! Hopefully it'll be a great bat recording device! Hopefully!
+A mid-spec battery-powered bat-recorder with an environmental sensor on the board, featuring the BME280 and Knowles Winfrey paired with a Pi Pico, with low-loss parts! Hopefully it'll be a great bat recording device! Hopefully! *I have to emphasize that it is, at least as of Version 3 of the PCB, designed to work across from ~50 Hz all the way to 240 kHz... not just bats. My lady has forced some changes!* 
 
 This is my first time with C (embedded or otherwise) and with a bunch of other things- PCBs, electronics, 3D cases, so you will have to bare with me whilst I work through this project bit by bit 😅
 
 ## Features/Hardware 
-- BME280 for Environmental Sensing (Temp, Pressure, Humidity)
-- Knowles Winfrey Microphone with Differential Amplifier -> Inverting Amplifier Cascade for audio
+- BME280 for Environmental Sensing (Temp, Pressure, Humidity) as an optional attachment (attached to environmental case with 6-core custom USB-C cable!) 
+- Knowles Winfrey Microphone with Differential Amplifier -> Inverting Amplifier Cascade for audio (giving single-ended-equivalent gains minimum 220+!)
 - Variable gain on the inverting amplifier w/ fixed gain on the differential for better noise performance 
-- Low-power-standby of ~1mA dormancy when awaiting recording sessions
-- Various passive filters in circuitry to minimize noise, paired with first-order high-pass filter on ADC input
+- Low-power-standby of ~1mA dormancy when awaiting recording sessions (digital assembly and analogue disabled during standby.)
 - Compatible with any/all MicroSD cards ostensibly. Cheap 64GB Sandisk Ultra's can handle the full 499.999 kHz that the Pi Pico ADC can output!
-- Supercapacitor on RTC allows upwards of 15 minutes to exchange batteries without losing timing configuration 
-- Recommend conformal coating Silicone, avoiding ports on BME280 + Winfrey, to increase resilience to environment (sensor needs exposure.)
+- Supercapacitor on RTC allows upwards of 15 minutes to exchange batteries without losing timing configuration- no need to reconfigure after re-batterying... battery-re.. whatever!
+- **WIP**, provided case designs can be 3D printed appropriately to provide waterproofing (or weatherproofing in case of use of weather sensor addon) of the vespertilio 
 
 ## Planned Hardware Features
-- External ADC rather than RP2040 ADC, giving 14/16-bit instead of 12-bit at 1 MHz. Aiming to integrate a MCP33151/41-XX, specifically, or something similarly specced. 1 Mhz -> 5x oversampling @ 192 kHz, 10x oversampling @ 96 kHz. Would improve noise performance, as ADC measurements carried out isolated from internals of RP2040 (SPI line exception.)
-- Transfer BME280 to secondary PCB with wire connector through waterproof case (at moment, need case with hole on bottom) to maximize damage safety, and replace with the BME688 to allow for air quality to also be obtained- the AI module may prove useful. 
-- Reduce PCB size to be comparable to other similar devices (this is my first time on the block- cut me some slack.)
 - Replace Winfrey with Infineon Ultrasonic MEMS when it gets released, which features ultrasonic speaker functionality and better performance/SNR/AOP/etc at higher f.
-- Addition of an ambient light sensor to give not 3-parameter, but 4-parameter environmental sensing.
+- External ADC rather than RP2040 ADC, giving 14/16-bit instead of 12-bit at 1 MHz. Aiming to integrate a MCP33151/41-XX, specifically, or something similarly specced. 1 Mhz -> 5x oversampling @ 192 kHz, 10x oversampling @ 96 kHz. Would improve noise performance, as ADC measurements carried out isolated from internals of RP2040 (SPI line exception.) This will be a very late WIP project- I haven't tested whether the performance of the onboard ADC is good enough yet to warrant upgrading from it. 
 
 ## Current work
 - Modifying 3D waterproof case designs to accommodate current design, including adding port for weather sensor option.
@@ -33,3 +29,5 @@ This is my first time with C (embedded or otherwise) and with a bunch of other t
 ![](https://github.com/callous4567/vespertilio/blob/main/current_pcbs.png)
 ^*The current spread of PCBS and concept. vespertilio is optionally attached, by a USB-C connector manhandled into an SPI connector, to a weather module PCB.
 You don't need to use the weather module- doing so costs about £10-ish. The 3D-printed case plans will allow for optional use of it.*
+
+
