@@ -8,18 +8,19 @@ This is my first time with C (embedded or otherwise) and with a bunch of other t
 ## Features/Hardware 
 - BME280 for Environmental Sensing (Temp, Pressure, Humidity) as an optional attachment (attached to environmental case with 6-core custom USB-C cable!) 
 - Knowles Winfrey Microphone with Differential Amplifier -> Inverting Amplifier Cascade for audio (giving single-ended-equivalent gains minimum 220+!)
+- Vishay VEML6040A3OG to provide ambient light sensing of the environment
 - Variable gain on the inverting amplifier w/ fixed gain on the differential for better noise performance 
 - Low-power-standby of ~1mA dormancy when awaiting recording sessions (digital assembly and analogue disabled during standby.)
 - Compatible with usual MicroSD cards- Sandisk has been tested (16GB, 32GB, 64GB Ultra) to work fine at 480 kHz.
 - Supercapacitor on RTC allows upwards of 15 minutes to exchange batteries without losing timing configuration- no need to reconfigure after re-batterying... battery-re.. whatever!
 - Competetive BOM cost: roughly £40 as of Ver 4 without the weather sensor addon, which adds about £10 to the final cost.
 - **WIP**, provided case designs can be 3D printed appropriately to provide waterproof (weatherproof with weather sensor- it compromises the waterproof seal) sealed case for the device, allowing use in all usual environments 
-
+- **WIP**, power usage is roughly 30 mA at 192 kHz and 60 mA at 480 kHz. Aiming to reduce (by modifying system and SPI clock against ADC clock requirement) power usage.
 
 
 ## Current work
 - Designing 3D weatherproof casings for vespertilio, BME attachment, and BME USB-SPI interface. *The concept is done- just need time to modify current designs.*
-- Cleaning up main body C code and optimization, alongside changing clock settings anticipating 1+ MHz ADC oversampling requirements. *Need time.*
+- Cleaning up main body C code and optimization, alongside changing clock settings. *Need time.*
 - Planning for process on characterizing recording capabilities and specification w.r.t directionality, sensitivity, etc. *Need bats, an ultrasonic audio source, and somewhere quiet.*
 
 
