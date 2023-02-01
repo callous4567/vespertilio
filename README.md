@@ -30,5 +30,6 @@ This is my first time with C (embedded or otherwise) and with a bunch of other t
 
 ![](https://github.com/callous4567/Batcorder/blob/main/VER_3_EX.jpg)
 ^*just the example I'm currently programming on, the third version of the PCB! The strange orange glob is a ball of kapton tape encasing a MAX8510, testing the disabling & desoldering/removal of the onboard DC-DC converter of the Pi Pico to improve noise performance (just disabling it isn't enough- you have to remove it completely for it to be extra effective. It works great, btw!*
-![](https://github.com/callous4567/vespertilio/blob/main/current_pcbs.jpg)
-^*The current spread of PCBS. The leftmost is the main body, the right two provide the optional weather sensor module (attached to the otherwise-waterproof, then weatherproof, case.*
+![](https://github.com/callous4567/vespertilio/blob/main/current_pcbs.png)
+^*The current spread of PCBS and concept. vespertilio is optionally attached, by a USB-C connector manhandled into an SPI connector, to a weather module PCB.
+You don't need to use the weather module- doing so costs about £10-ish. The 3D-printed case plans will allow for optional use of it.*
