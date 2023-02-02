@@ -19,7 +19,8 @@ This is my first time with C (embedded or otherwise) and with a bunch of other t
 - **WIP**, power usage is roughly 30 mA at 192 kHz and 60 mA at 480 kHz. Aiming to reduce (by modifying system and SPI clock against ADC clock requirement) power usage.
 
 
-## Current work
+## Todo/current
+- Clean up schematics, BOM, etc, for V4. PCBs
 - Designing 3D weatherproof casings for vespertilio, BME attachment, and BME USB-SPI interface. *The concept is done- just need time to modify current designs.*
 - Cleaning up main body C code and optimization, alongside changing clock settings. *Need time.*
 - Planning for process on characterizing recording capabilities and specification w.r.t directionality, sensitivity, etc. *Need bats, an ultrasonic audio source, and somewhere quiet.*
