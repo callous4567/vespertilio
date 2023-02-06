@@ -6,9 +6,9 @@ Some epoxy will help keep the battery clips in place- though it should not be ne
 
 This is a WIP and all of this will be mentioned in the future guide I will write on how to build it/use it. For now though, for your viewing pleasure! 
 
-![](https://github.com/callous4567/Batcorder/blob/main/VER_3_EX.jpg)
+![](https://github.com/callous4567/vespertilio/blob/main/Case%20%26%20Environmental%20Concept/Internal%20Case%20Designs/front.png)
 From the front, showing M2 screws alignment with the PCB going onto the case. 
 
-![](https://github.com/callous4567/vespertilio/blob/main/current_pcbs.png)
+![](https://github.com/callous4567/vespertilio/blob/main/Case%20%26%20Environmental%20Concept/Internal%20Case%20Designs/rear.png)
 From the back, showing the battery compartment (without the clips put on yet.) You'll want to align the clips up so that the leaf-spring one
 goes on the female and the flat no-spring one goes on the male. In any case, check the BOM. 
