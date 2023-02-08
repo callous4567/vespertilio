@@ -1,9 +1,9 @@
 ![](https://github.com/callous4567/Batcorder/blob/main/design_bat.png)
 
 ## General description 
-A mid-spec battery-powered bat-recorder with an environmental sensor on the board, featuring the BME280 and Knowles Winfrey paired with a Pi Pico, with low-loss parts! Hopefully it'll be a great bat recording device! Hopefully! *I have to emphasize that it is, at least as of Version 3 of the PCB, designed to work across from ~50 Hz all the way to 240 kHz... not just bats. My lady has forced some changes!* 
+A battery-powered (for now!) bioacoustic recorder with a built-in ambient light sensor, and an optional weather-sensing addon attached by an onboard hijacked USB-C connector! Very much a WIP!
 
-This is my first time with C (embedded or otherwise) and with a bunch of other things- PCBs, electronics, 3D cases, so you will have to bare with me whilst I work through this project bit by bit 😅
+This is my first time with C (embedded or otherwise) and with a bunch of other things- PCBs, electronics, 3D CAD/printing/etc, so you will have to bare with me whilst I work through this project bit by bit 😅
 
 ## Features 
 - BME280 for Environmental Sensing (Temp, Pressure, Humidity) as an optional attachment (attached to environmental case with 6-core custom USB-C cable!) 
@@ -13,7 +13,7 @@ This is my first time with C (embedded or otherwise) and with a bunch of other t
 - Low-power-standby of ~1mA dormancy when awaiting recording sessions (digital assembly and analogue disabled during standby.)
 - Compatible with usual MicroSD cards- Sandisk has been tested (16GB, 32GB, 64GB Ultra) to work fine at 480 kHz.
 - Supercapacitor on RTC allows upwards of 15 minutes to exchange batteries without losing timing configuration- no need to reconfigure after re-batterying... battery-re.. whatever!
-- Competetive BOM cost: roughly £40 as of Ver 4 without the weather sensor addon, which adds about £10 to the final cost.
+- Competitive BOM cost: roughly £40 as of Ver 4 without the weather sensor addon, which adds about £10 to the final cost.
 - USB configurable recording schedules using desktop .exe and .json. **WIP**, allow for setting sampling frequency with each session, too, and make a GUI for configuration. **WIP**, also set the firmware over USB without having to toggle bootsel on the Pico. 
 - **WIP**, provided case designs can be 3D printed appropriately to provide waterproof (weatherproof with weather sensor- it compromises the waterproof seal) sealed case for the device, allowing use in all usual environments 
 - **WIP**, power usage is roughly 30 mA at 192 kHz and 60 mA at 480 kHz. Aiming to reduce (by modifying system and SPI clock against ADC clock requirement) power usage.
