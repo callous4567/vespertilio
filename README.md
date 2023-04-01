@@ -32,7 +32,7 @@ This is my first time with C (embedded or otherwise) and with a bunch of other t
 
 
 
-![](https://github.com/callous4567/vespertilio/blob/main/current_pcbs.png)
+![](https://github.com/callous4567/vespertilio/blob/main/current_pcbs.jpg)
 ^*The current spread of PCBS and concept. vespertilio is optionally attached, by a USB-C connector manhandled into an SPI connector, to a weather module PCB.
 You don't need to use the weather module- doing so costs about £10-ish. The 3D-printed case plans will allow for optional use of it. You'll note that I added that little lightmeter- U1 :)*
 
