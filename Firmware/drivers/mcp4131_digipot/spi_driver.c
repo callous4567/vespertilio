@@ -5,35 +5,32 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/**
+ *  IMPORTANT TODO NOTE 
+ * This driver needs some optimization
+ * We need to clean up our <-> and struct for the potentiometer
+ * Note that we are now using just a single potentiometer (instead of 2) and just on the inverting amplifier (singular.)
+ * 
+ * 
+*/
+
 // select either potentiometer (pull down)
-void dpot_select(dpot_dual_t* DPOT, int32_t which) {
-    if (which==(int32_t)1) {
-        gpio_put(DPOT->CSN_1, 0);
-    } else {
-        gpio_set_pulls(DPOT->CSN_2, false, true);
-        gpio_put(DPOT->CSN_2, 0);
-    }
+static void dpot_select(dpot_dual_t* DPOT) {
+    gpio_put(DPOT->CSN, 0);
 }
 
 // deselect either potentiometer (pull up)
-void dpot_deselect(dpot_dual_t* DPOT, int32_t which) {
-    if (which==(int32_t)1) {
-        gpio_put(DPOT->CSN_1, 1);
-    } else {
-        gpio_put(DPOT->CSN_2, 1);
-    }
+static void dpot_deselect(dpot_dual_t* DPOT) {
+    gpio_put(DPOT->CSN, 1);
 }
 
 // set up CSN pins in default state. need pullups (see PCB revision)
 static inline void default_csn(dpot_dual_t* DPOT) {
 
     // Setup pins for CSN
-    gpio_init(DPOT->CSN_1);
-    gpio_set_dir(DPOT->CSN_1, true);
-    gpio_put(DPOT->CSN_1, 1);
-    gpio_init(DPOT->CSN_2);
-    gpio_set_dir(DPOT->CSN_2, true);
-    gpio_put(DPOT->CSN_2, 1);
+    gpio_init(DPOT->CSN);
+    gpio_set_dir(DPOT->CSN, true);
+    gpio_put(DPOT->CSN, 1);
     
 }
 
@@ -44,8 +41,7 @@ dpot_dual_t* init_dpot(void) {
     dpot_dual_t* DPOT = (dpot_dual_t*)malloc(sizeof(dpot_dual_t));
     DPOT->SCK_PIN = DPOT_SCK_PIN;
     DPOT->MOSI_PIN = DPOT_MOSI_PIN;
-    DPOT->CSN_1 = DPOT_CSN_PRIMARY;
-    DPOT->CSN_2 = DPOT_CSN_SECONDARY;
+    DPOT->CSN = DPOT_CSN;
     DPOT->MISO_PIN = DPOT_MISO_PIN;
     DPOT->hw_inst = DPOT_SPI;
     DPOT->baudrate = DPOT_BAUD;
@@ -93,7 +89,7 @@ the command bits are 00 for writing, 11 for reading.
 you need to read/write simultaneously. 
 note that in writes, the trailing 10-bits of data must be high, i.e. 0bXXXXXX ... 0b1111111111
 */
-static void dpot_read_tap(dpot_dual_t* DPOT, int32_t which) {
+void dpot_read_tap(dpot_dual_t* DPOT) {
 
     // craft our command (wiper address + command bits)
     uint16_t command_dual = (DPOT_WIPER<<12) | 0b0000111111111111; 
@@ -102,7 +98,7 @@ static void dpot_read_tap(dpot_dual_t* DPOT, int32_t which) {
     uint16_t return_dual;
 
     // select appropriate dpot 
-    dpot_select(DPOT, which);
+    dpot_select(DPOT);
 
     // let's do!
     spi_write16_read16_blocking(
@@ -113,26 +109,24 @@ static void dpot_read_tap(dpot_dual_t* DPOT, int32_t which) {
     );
 
     // deselect
-    dpot_deselect(DPOT, which);
+    dpot_deselect(DPOT);
 
     // isolate the last 9 bits of the return dual (see DS)
-    toBinary_16(return_dual);
+    //toBinary_16(return_dual);
     return_dual = 0b0000000111111111 & return_dual;
 
     // to binary it!
-    toBinary_16(return_dual);
+    //toBinary_16(return_dual);
+    printf("Tap reading %d\r\n", return_dual);
 
     // set the tap
-    if (which==(int32_t)1) {
-        DPOT->TAP_1 = (int32_t)return_dual;
-    } else {
-        DPOT->TAP_2 = (int32_t)return_dual;
-    }
+    DPOT->TAP = (int32_t)return_dual;
+
 
 }
 
 // NOTE!!! THE WIPER IS SCALED FROM TERMINAL B, NOT TERMINAL A!!!
-static void dpot_write_tap(dpot_dual_t* DPOT, int32_t which, int32_t value) {
+static void dpot_write_tap(dpot_dual_t* DPOT, int32_t value) {
 
     // panic if wiper exceeds max tap
     if (value > max_tap) {
@@ -144,7 +138,7 @@ static void dpot_write_tap(dpot_dual_t* DPOT, int32_t which, int32_t value) {
     command_dual = command_dual | value; // next the value  
 
     // select appropriate dpot 
-    dpot_select(DPOT, which);
+    dpot_select(DPOT);
 
     // let's do!
     spi_write16_blocking(
@@ -154,28 +148,28 @@ static void dpot_write_tap(dpot_dual_t* DPOT, int32_t which, int32_t value) {
     );
 
     // deselect
-    dpot_deselect(DPOT, which);
+    dpot_deselect(DPOT);
 
     // set the DPOT tap (we just assume everything worked out fine.)
-    if (which==(int32_t)1) {
-        DPOT->TAP_1 = value;
-    } else {
-        DPOT->TAP_2 = value;
-    }
+    DPOT->TAP = value;
+
+    // double check
+    // dpot_read_tap(DPOT);
 
 }
 
 // get status register of given DPOT 
-static void dpot_read_status(dpot_dual_t* DPOT, int32_t which) {
+void dpot_read_status(dpot_dual_t* DPOT) {
 
-    // craft our command (wiper address + command bits)
+    // craft our command (wiper address + command bits) : PAGE 47 OF THE DATASHEET https://www.mouser.co.uk/datasheet/2/268/MCHPS02708_1-2520528.pdf
+    // first 4 bits are the address in memory, the next two are the command bits (00 is write and 11 is read) and the last 12 bits are the data bits, all set to unity/null for a read
     uint16_t command_dual = (DPOT_STATUS<<12) | 0b0000111111111111; 
 
     // placeholder for return
     uint16_t return_dual;
 
     // select appropriate dpot 
-    dpot_select(DPOT, which);
+    dpot_select(DPOT);
 
     // let's do!
     spi_write16_read16_blocking(
@@ -186,7 +180,7 @@ static void dpot_read_status(dpot_dual_t* DPOT, int32_t which) {
     );
 
     // deselect
-    dpot_deselect(DPOT, which);
+    dpot_deselect(DPOT);
 
     // isolate the last 9 bits of the return dual (see DS)
     return_dual = 0b0000000111111111 & return_dual;
@@ -197,30 +191,27 @@ static void dpot_read_status(dpot_dual_t* DPOT, int32_t which) {
 }
 
 // set a gain for a given resistor. Note that wiper scales from terminal B!!!
-void dpot_set_gain(dpot_dual_t* DPOT, int32_t which, int32_t gain) {
+void dpot_set_gain(dpot_dual_t* DPOT, int32_t gain) {
 
     /*
-    GAIN FORMULA
+    GAIN FORMULA (for the inverting amplifier, with the MCP4131 set up as a varistor between P0A and the wiper, with 1k as the non-feedback-resistor)
     ============
 
-    (MAX_TAP - WIPER)/(WIPER - 0) = MAX/WIPER - 1 = G
-    MAX/WIPER = G + 1
-    WIPER = MAX/(G+1)
-
-    WIPER ZEROTH IS AT TERMINAL B NOT A!
+    wiper_value scales from 0 at terminal B to max_tap - 1 at terminal A 
+    (max_tap - wiper_value) = (wiper_distance_from_A)
+    (wiper_distance_from_A / max_tap) = (R_FEEDBACK/50K)
+    50K*(wiper_distance_from_A / max_tap) = R_FEEDBACK 
+    (50K/1K)*(wiper_distance_from_A / max_tap) = R_FEEDBACK/1K = GAIN = 50(wiper_distance_from_A / max_tap)
+    GAIN * MAX_TAP / 50 = max_tap - wiper_value
+    wiper_value = max_tap(1 - gain/50)
     */ 
 
-    int32_t wiper_value = max_tap/(gain+1);
-    wiper_value = max_tap - wiper_value;
-    dpot_write_tap(DPOT, which, wiper_value);
+    int32_t wiper_value = (max_tap * (1000 - (1000*gain/50))) / 1000;
+    dpot_write_tap(DPOT, wiper_value);
 
-    if (which==(int32_t)1) { 
-        DPOT->TAP_1 = wiper_value;
-        DPOT->GAIN_1 = gain;
-    } else {
-        DPOT->TAP_2 = wiper_value;
-        DPOT->GAIN_2 = gain;
-    }
+    DPOT->TAP = wiper_value;
+    DPOT->GAIN = gain;
+
 
 }
 

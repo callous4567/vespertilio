@@ -7,10 +7,15 @@ extern "C" {
 #include "drivers/mcp4131_digipot/spi_driver.h"
 #include "drivers/bme280/bme280_spi.h"
 #include "drivers/pico_usb_configure/vespertilio_usb_int.h"
+#include "drivers/veml/i2c_driver.h"
 }
 #include "hardware/vreg.h"
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
+#include "hardware/adc.h"
+
+
+#define PLL 200000
 
 /*
 
@@ -36,14 +41,22 @@ extern "C" {
 */
 
 // Run a test of the SD functionality 
+
 int main() {
 
-    digi_enable(); // initialize digital assembly for RTC/etc pullups by default 
-    ana_disable(); // ensure analogue is disabled 
-    debug_init_LED(); // initialize debug LED 
+    busy_wait_ms(1000);
     stdio_init_all(); // initialize STDIO for debugging + USB configuration
+    digi_enable(); // initialize digital assembly for RTC/etc pullups by default 
+    ana_enable(); // ensure analogue is disabled 
 
-    
+    debug_init_LED(); // initialize debug LED 
+    dpot_dual_t* DPOT = init_dpot(); // set up gains 
+    dpot_set_gain(DPOT, 20);
+    deinit_dpot(DPOT);
+    default_variables();  
+    run_wav_bme_sequence_single(); // run the BME sequence (which will self-free) 
+
+    /*
     int32_t success = usb_configurate(); // attempt USB configuration... returns either (0) for panic/failed, (1) for success, or (2) for handshake failed...
 
     switch (success) 
@@ -69,8 +82,7 @@ int main() {
                 debug_flash_LED(10, 100);
 
                 dpot_dual_t* DPOT = init_dpot(); // set up gains 
-                dpot_set_gain(DPOT, 1, 30);
-                dpot_set_gain(DPOT, 2, 20);
+                dpot_set_gain(DPOT, 20);
                 deinit_dpot(DPOT);
 
                 run_wav_bme_sequence_single(); // run the BME sequence (which will self-free) 
@@ -90,8 +102,6 @@ int main() {
 
         case 1: { // just wait an hour and do nothing. configuration was success.
 
-            digi_disable(); // disable digital assembly 
-            printf("Configuration success! %d\r\n", success);
             busy_wait_ms(1000*3600);
 
         }
@@ -100,8 +110,7 @@ int main() {
 
         case 0: { // same as for true, except in this case the configuration failed/
 
-            digi_disable(); // disable digital assembly 
-            printf("Configuration failed...\r\n");
+            debug_flash_LED(1000, 100);
             busy_wait_ms(1000*3600); 
 
         }
@@ -109,9 +118,6 @@ int main() {
         break;
 
         default: {// AGGRESSIVE FLASHING 
-
-            digi_disable(); // disable digital assembly 
-            printf("Something went badly wrong...\r\n");
 
             while (true) {
                 
@@ -125,4 +131,7 @@ int main() {
 
     }
 
+    */
+    
+    
 }

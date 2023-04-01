@@ -1,26 +1,46 @@
 #include "utils.h"
+#include "hardware/pwm.h"
+
 
 // Consts for the enable pins 
-static const int32_t DIGI_ENABLE = 6; // pull high to enable digital
-static const int32_t ANA_ENABLE = 28; // pull low to enable analogue
+static const int32_t DIGI_ENABLE = 6; // pull low to make gate-source negative + enable PFET 
+static const int32_t ANA_ENABLE = 22; // pull high to enable analogue with conventional load switch
 
+
+/**
+ * We will slowly ramp up to 3V3 using PWM duty cycle @ the full 125 MHz (this will introduce ripple into 3V3 of the MAX8510, but it should be fine)
+ * According to the datasheet, "• −1.8 V Rated for Low Voltage Gate Drive" for the NTR3A052PZ/D. 
+ * Source is 3V3. Set the gate to 1.5V, and you have gate-source of -1.8V (full drive)
+ * Vary the duty on the gate from 2.5V down to 1.5V, then jump straight to turning the PWM off and shorting the gate.
+*/
 void digi_enable(void) {
+
+    // All done. Reset the GPIO, disable PWM, etc etc, and short it.
+    gpio_deinit(DIGI_ENABLE);
+    gpio_init(DIGI_ENABLE);
+    gpio_set_dir(DIGI_ENABLE, GPIO_OUT);
+    gpio_put(DIGI_ENABLE, 0);
+    busy_wait_ms(100); // for capacitor inrush 
+    
+}
+void digi_disable(void) {
     gpio_init(DIGI_ENABLE);
     gpio_set_dir(DIGI_ENABLE, GPIO_OUT);
     gpio_put(DIGI_ENABLE, 1);
-    gpio_set_drive_strength(DIGI_ENABLE, GPIO_DRIVE_STRENGTH_2MA);
-}
-void digi_disable(void) {
-    gpio_put(DIGI_ENABLE, 0);
+    gpio_set_drive_strength(DIGI_ENABLE, GPIO_DRIVE_STRENGTH_4MA);
 }
 void ana_enable(void) {
     gpio_init(ANA_ENABLE);
     gpio_set_dir(ANA_ENABLE, GPIO_OUT);
-    gpio_put(ANA_ENABLE, 0);
-    gpio_set_drive_strength(ANA_ENABLE, GPIO_DRIVE_STRENGTH_2MA);
+    gpio_put(ANA_ENABLE, 1); // Ver 1 PCB this should be pulled low instead 
+    gpio_set_drive_strength(ANA_ENABLE, GPIO_DRIVE_STRENGTH_4MA);
+
 }
 void ana_disable(void) {
-    gpio_put(ANA_ENABLE, 1);
+    gpio_init(ANA_ENABLE);
+    gpio_set_dir(ANA_ENABLE, GPIO_OUT);
+    gpio_put(ANA_ENABLE, 0);
+    gpio_set_drive_strength(ANA_ENABLE, GPIO_DRIVE_STRENGTH_4MA);
 }
 
 // Print as binary the individual 8-bit byte a 
@@ -50,7 +70,7 @@ void debug_init_LED(void) {
     gpio_put(25, 0);
 }
 
-// Flash the LED pin (x) times with a period in milliseconds 
+// Flash the LED pin (x) times with a period in MILLISECONDS!!!! 
 void debug_flash_LED(int32_t x, int32_t period) {
 
     for (int i = 0; i < x; i++) {

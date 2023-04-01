@@ -38,7 +38,7 @@ static const int32_t BME_MISO_PIN = 4;
 static const int32_t BME_SCK_PIN = 2;
 
 // define baudrate and spi 
-static const int32_t BME_BAUD = 1*1000*1000;
+static const int32_t BME_BAUD = 10*1000*1000;
 static spi_inst_t* BME_HW_INST = spi0;
 
 int32_t t_fine;

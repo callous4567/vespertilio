@@ -5,8 +5,7 @@
 
 extern const int32_t DPOT_SCK_PIN,
 DPOT_MOSI_PIN,
-DPOT_CSN_PRIMARY,
-DPOT_CSN_SECONDARY,
+DPOT_CSN,
 DPOT_MISO_PIN;
 
 extern spi_inst_t* DPOT_SPI;

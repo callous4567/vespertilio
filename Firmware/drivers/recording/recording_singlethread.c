@@ -33,7 +33,7 @@ static void init_dma_buf(recording_multicore_struct_single_t* multicore_struct) 
     channel_config_set_write_increment(multicore_struct->ADC_BUFA_CONF, true);
     channel_config_set_dreq(multicore_struct->ADC_BUFA_CONF, DREQ_ADC);
 
-    // Apply the configurations (MUST BE DONE AFTER SETTING UP THE CONFIG OBJECTS!!!) https://forums.raspberrypi.com/viewtopic.php?t=335738
+    // Apply the configurations (MUST BE DONE AFTER SETTING UP THE CONFIG OBJECTS!!!) https://forums.raspberrypi.com/viewtopic.php?t=335TIME_VEML_BME_STRINGSIZE8
     dma_channel_configure(
         *multicore_struct->ADC_BUFA_CHAN,
         multicore_struct->ADC_BUFA_CONF,
@@ -203,15 +203,22 @@ static recording_multicore_struct_single_t* audiostruct_generate_single(void) {
     multicore_struct->active = (bool*)malloc(sizeof(bool));
     *multicore_struct->active = false;
 
-    // Set up pointers for the BME too (and init it.)
-    if (USE_BME==true) {
+    // Set up RTC
+    multicore_struct->EXT_RTC = (ext_rtc_t*)malloc(sizeof(ext_rtc_t));
+    multicore_struct->EXT_RTC = init_RTC_default();
+
+    // Set up pointers for the ENV too (and init it.) We do this after the RTC, because the VEML needs the RTC I2C to be running already. 
+    if (USE_ENV==true) {
 
         // Datastring/timestring/init/fullstring/etc
         multicore_struct->BME_DATASTRING = (char*)malloc(20); // 20 bytes for the BME data 
-        multicore_struct->BME_AND_TIME_STRING = (char*)malloc(45); // 20 bytes + 22 RTC bytes + 2 byte spacer + 1 byte newline 
-        multicore_struct->BME_STRINGBUFFER = (char*)malloc(BME_BUFFER_SIZE);
-        multicore_struct->BME_SHOULD_CONTINUE = (bool*)malloc(sizeof(bool));
-        multicore_struct->BME_SLEEPING = (bool*)malloc(sizeof(bool));
+        multicore_struct->ENV_AND_TIME_STRING = (char*)malloc(TIME_VEML_BME_STRINGSIZE); // 22 RTC bytes + 2 byte spacer + 20 bytes BME + 2 byte spacer + 26 bytes VEML + 1 byte newline 
+        multicore_struct->ENV_STRINGBUFFER = (char*)malloc(ENV_BUFFER_SIZE);
+        multicore_struct->ENV_SHOULD_CONTINUE = (bool*)malloc(sizeof(bool));
+        multicore_struct->ENV_SLEEPING = (bool*)malloc(sizeof(bool));
+
+        // Default VEML
+        multicore_struct->VEML = init_VEML_default();
 
         // The microSD pointers too.
         multicore_struct->mSD->fp_env = (FIL*)malloc(sizeof(FIL));
@@ -219,10 +226,6 @@ static recording_multicore_struct_single_t* audiostruct_generate_single(void) {
         multicore_struct->mSD->fp_env_filename = (char*)malloc(30); // 22 bytes for the time fullstring, 4 for .env, 4 for .txt 
 
     }
-
-    // Finally let's do the RTC 
-    multicore_struct->EXT_RTC = (ext_rtc_t*)malloc(sizeof(ext_rtc_t));
-    multicore_struct->EXT_RTC = init_RTC_default();
 
     // Now the DMA chans
     init_dma_buf(multicore_struct);  // init the DMA/BUF configuration
@@ -284,7 +287,7 @@ static void init_wav_file(recording_multicore_struct_single_t* multicore_struct)
 }
 
 // initialize the BME text file for the current time taken from the RTC and open it for writing. Note that this assumes you have already gotten the EXT_RTC fullstring (you should have, for init_wav.)
-static void init_bme_file(recording_multicore_struct_single_t* multicore_struct) {
+static void init_env_file(recording_multicore_struct_single_t* multicore_struct) {
 
     // Generate a string with the time at the front and .wav on the end: fullstring is maximum of 22 bytes, .env is 4 bytes, .txt is 4 bytes, making 30
     snprintf(
@@ -313,32 +316,36 @@ static void init_bme_file(recording_multicore_struct_single_t* multicore_struct)
 }
 
 /* initiate a BME file write, pack the buffer, then write it. will reset the buffer, too. */
-static void core1_bme_file(recording_multicore_struct_single_t* multicore_struct) {
+static void core1_env_file(recording_multicore_struct_single_t* multicore_struct) {
 
-    memset(multicore_struct->BME_STRINGBUFFER, 0, BME_BUFFER_SIZE); // reset stringbuf
+    memset(multicore_struct->ENV_STRINGBUFFER, 0, ENV_BUFFER_SIZE); // reset stringbuf
     int32_t bytes_written = 0;
-    while (*multicore_struct->BME_SHOULD_CONTINUE) { // gather data for the correct number
+    while (*multicore_struct->ENV_SHOULD_CONTINUE) { // gather data for the correct number
 
-        *multicore_struct->BME_SLEEPING=false;
+        *multicore_struct->ENV_SLEEPING=false;
 
         // read the BME datastring (20 bytes max)
         bme_datastring(multicore_struct->BME_DATASTRING);
 
+        // next read the VEML string (26 bytes max)
+        veml_read_rgbw(multicore_struct->VEML);
+
         // also read the RTC to record time with the BME data (22 bytes max)
         rtc_read_string_time(multicore_struct->EXT_RTC);
 
-        // snprintf what we want on to our buffer 
+        // snprintf what we want on to our buffer. 20 + 26 + 22 = 68, plus two underscores (2*2) and a newline (1) makes TIME_VEML_BME_STRINGSIZE. 
         snprintf(
-            multicore_struct->BME_STRINGBUFFER + bytes_written,
-            45,
-            "%s_%s\n", 
+            multicore_struct->ENV_STRINGBUFFER + bytes_written,
+            TIME_VEML_BME_STRINGSIZE,
+            "%s_%s_%s\n", 
             multicore_struct->EXT_RTC->fullstring,
-            multicore_struct->BME_DATASTRING
+            multicore_struct->BME_DATASTRING,
+            multicore_struct->VEML->colstring
         );
-        bytes_written += 45; // iterate the offset for writing, too. 
+        bytes_written += TIME_VEML_BME_STRINGSIZE; // iterate the offset for writing, too. 
         *multicore_struct->mSD->bw_env = bytes_written; // update the number of bytes we have to handle.
-        *multicore_struct->BME_SLEEPING=true;
-        sleep_ms(BME_RECORD_PERIOD_SECONDS*1000 - 5);
+        *multicore_struct->ENV_SLEEPING=true;
+        sleep_ms(ENV_RECORD_PERIOD_SECONDS*1000 - 5); // precess by 5 ms to account for the cost of running this bit of the code 
 
     }
 
@@ -347,22 +354,23 @@ static void core1_bme_file(recording_multicore_struct_single_t* multicore_struct
 /* Process for core1. 
 Run this at the start of recordings after you have generated the two appropriate files.
 This will create the bme1 file loop and run it indefinitely.
-To terminate, just set BME_SHOULD_CONTINUE to false and them shut down core1/reset it.
-The file loop will launch the first cycle on BME_SHOULD_CONTINUE=true 
-After this, it will do one file until you call BME_SHOULD_CONTINUE=false (then write the file.)
-It will then do another file when BME_SHOULD_CONTINUE is set back to true, and so it loops.
+To terminate, just set ENV_SHOULD_CONTINUE to false and them shut down core1/reset it.
+The file loop will launch the first cycle on ENV_SHOULD_CONTINUE=true 
+After this, it will do one file until you call ENV_SHOULD_CONTINUE=false (then write the file.)
+It will then do another file when ENV_SHOULD_CONTINUE is set back to true, and so it loops.
 */
 static void core1_process(void) {
 
     recording_multicore_struct_single_t* multicore_struct = (recording_multicore_struct_single_t*)multicore_fifo_pop_blocking();
 
+    // set up the BME for SPI. Note that the VEML is just I2C and we already set that up earlier with the RTC I2C/etc. 
     setup_bme(); 
     uint32_t pacer;
 
     while (true) { 
         pacer = (uint32_t)multicore_fifo_pop_blocking(); // wait for the host to say we're good to initialize the file + run
-        *multicore_struct->BME_SHOULD_CONTINUE=true;
-        core1_bme_file(multicore_struct);
+        *multicore_struct->ENV_SHOULD_CONTINUE=true;
+        core1_env_file(multicore_struct);
     }
 
 }
@@ -393,17 +401,19 @@ static void free_audiostruct(recording_multicore_struct_single_t* multicore_stru
     free(multicore_struct->ADC_BUFA_CONF);
 
     // if the BME exists
-    if (USE_BME) {
+    if (USE_ENV) {
 
         free(multicore_struct->BME_DATASTRING);
-        free(multicore_struct->BME_AND_TIME_STRING);
-        free(multicore_struct->BME_SHOULD_CONTINUE);
-        free(multicore_struct->BME_SLEEPING);
-        free(multicore_struct->BME_STRINGBUFFER);
+        free(multicore_struct->ENV_AND_TIME_STRING);
+        free(multicore_struct->ENV_SHOULD_CONTINUE);
+        free(multicore_struct->ENV_SLEEPING);
+        free(multicore_struct->ENV_STRINGBUFFER);
+        veml_free(multicore_struct->VEML);
 
     }
 
-    // that should be it... I hope...
+    // Free the struct overall, too.
+    free(multicore_struct);
 
 }
 
@@ -419,7 +429,7 @@ void run_wav_bme_sequence_single(void) {
 
     rtc_read_string_time(test_struct->EXT_RTC); // read the rtc time 
     datetime_t* dtime = init_pico_rtc(test_struct->EXT_RTC); // init the pico RTC + configure from the external RTC
-    if (USE_BME) { // launch core1 process.
+    if (USE_ENV) { // launch core1 process.
         multicore_launch_core1(core1_process);
         multicore_fifo_push_blocking((uintptr_t)test_struct); // pass over our test_struct 
     }
@@ -432,7 +442,7 @@ void run_wav_bme_sequence_single(void) {
         rtc_read_string_time(test_struct->EXT_RTC); // read string time 
         update_pico_rtc(test_struct->EXT_RTC, dtime); // update the pico RTC for file writing
 
-        if (USE_BME) {
+        if (USE_ENV) {
             multicore_fifo_push_blocking((uint32_t)1); // pass over an int32 to init a new bme file/etc 
         }
 
@@ -456,16 +466,16 @@ void run_wav_bme_sequence_single(void) {
         }
         sd_active_done(test_struct);
 
-        if (USE_BME) { 
-            *test_struct->BME_SHOULD_CONTINUE=false; // stop data gathering. this is set back to true by core1 when we push again.
-            while (!*test_struct->BME_SLEEPING) {
+        if (USE_ENV) { 
+            *test_struct->ENV_SHOULD_CONTINUE=false; // stop data gathering. this is set back to true by core1 when we push again.
+            while (!*test_struct->ENV_SLEEPING) {
                 busy_wait_us(100);
             }
             sd_active_wait(test_struct); 
-            init_bme_file(test_struct); // init the file: we are golden to go 
-            int32_t strings_to_dump = *test_struct->mSD->bw_env/45;
+            init_env_file(test_struct); // init the file: we are golden to go 
+            int32_t strings_to_dump = *test_struct->mSD->bw_env/TIME_VEML_BME_STRINGSIZE;
             for (int k = 0; k < strings_to_dump; k++) {
-                f_puts(test_struct->BME_STRINGBUFFER + 45*k, test_struct->mSD->fp_env);
+                f_puts(test_struct->ENV_STRINGBUFFER + TIME_VEML_BME_STRINGSIZE*k, test_struct->mSD->fp_env);
             }
             FRESULT fr;
             fr = f_close(test_struct->mSD->fp_env);
@@ -478,8 +488,8 @@ void run_wav_bme_sequence_single(void) {
 
     }
 
-    if (USE_BME) {
-        busy_wait_ms(1100*BME_RECORD_PERIOD_SECONDS);
+    if (USE_ENV) {
+        busy_wait_ms(1100*ENV_RECORD_PERIOD_SECONDS);
         multicore_reset_core1();
     }
     f_unmount(test_struct->mSD->pSD->pcName);

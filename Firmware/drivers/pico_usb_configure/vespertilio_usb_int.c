@@ -18,6 +18,7 @@ static const int32_t CONFIG_FLASH_OFFSET = PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_
 const int32_t CONFIGURATION_BUFFER_INDEPENDENT_VALUES = 4; // 1-based not 0-based: number of values in the desktop JSON we transfer over
 static const int32_t CONFIGURATION_BUFFER_MAX_VARIABLES = FLASH_PAGE_SIZE/4; // in int32_t max size of the flash page (256 bytes / int32_t=4 -> 64 variables.)
 
+
 /*
 XIP_BASE is 0x10000000 and extends from here. XIP_BASE is the zeroth byte of the flash.
 #define PICO_FLASH_SIZE_BYTES (2 * 1024 * 1024) (pico.h)
@@ -56,8 +57,8 @@ The end value, CONFIG_SUCCESS, should be set to unity.
 // INDEPENDENT VARIABLES FOR RECORDING SPECIFICS: CONFIGURATION_BUFFER_INDEPENDENT_VALUES of them: set recording parameters.
 0)                                                                              int32_t ADC_SAMPLE_RATE = 192000;               
 1)                                                                              int32_t RECORDING_LENGTH_SECONDS = 30;           
-2)                                                                              int32_t USE_BME = true;                         
-3 = CONFIGURATION_BUFFER_INDEPENDENT_VALUES - 1)                                int32_t BME_RECORD_PERIOD_SECONDS = 2;           
+2)                                                                              int32_t USE_ENV = true;                         
+3 = CONFIGURATION_BUFFER_INDEPENDENT_VALUES - 1)                                int32_t ENV_RECORD_PERIOD_SECONDS = 2;           
 
 // INDEPENDENT TIME VARIABLES- 7 of them. USED BY RTC starting from zero-based index CONFIGURATION_BUFFER_INDEPENDENT_VALUES total of CONFIGURATION_RTC_INDEPENDENT_VALUES
 CONFIGURATION_BUFFER_INDEPENDENT_VALUES)                                        int32_t SECOND;
@@ -333,9 +334,49 @@ int usb_configurate(void) {
 
 }
 
+// write a test to flash
+void test_write(void) {
+
+    // create our test flash page, which must be in the form of uint8_t 
+    uint8_t* flashblock = (uint8_t*)malloc(FLASH_PAGE_SIZE); 
+
+    // populate the first elements with something unique to remember... (1,1,0,0,1,0,0,1)
+    *flashblock = 1;
+    *(flashblock + 1) = 1;
+    *(flashblock + 2) = 0;
+    *(flashblock + 3) = 0;
+    *(flashblock + 4) = 1;
+    *(flashblock + 5) = 0;
+    *(flashblock + 6) = 0;
+    *(flashblock + 7) = 1;
+
+    // Disable interrupts https://kevinboone.me/picoflash.html?i=1
+    uint32_t ints = save_and_disable_interrupts();
+
+    // erase the sector at our offset
+    flash_range_erase(CONFIG_FLASH_OFFSET, FLASH_SECTOR_SIZE); // erase the sector at our offset
+
+    // write the page
+    flash_range_program(CONFIG_FLASH_OFFSET, flashblock, FLASH_PAGE_SIZE); // write the page
+
+    // Enable interrupts
+    restore_interrupts (ints); // Enable interrupts
+
+    // free
+    free(flashblock);
+
+}
+
+// read back the flashblock to verify
+void test_read(void) {
 
 
+    for (int i = 0; i < 8; i++) {
+        printf("The value for index %d is %d\r\n", i, *( (uint8_t*)(XIP_BASE + CONFIG_FLASH_OFFSET + i) )); 
+    }
+    
 
+}
 
 
 /* DEPRECATED VERSION WITHOUT TIME SCHEDULING DEPRECATED VERSION WITHOUT TIME SCHEDULING DEPRECATED VERSION WITHOUT TIME SCHEDULING DEPRECATED VERSION WITHOUT TIME SCHEDULING DEPRECATED VERSION WITHOUT TIME SCHEDULING 
@@ -348,8 +389,8 @@ int usb_configurate(void) {
 0) int32_t ADC_SAMPLE_RATE = 192000;
 1) int32_t RECORDING_LENGTH_SECONDS = 30; // note that BME files are matched to this recording length, too. 
 2) int32_t RECORDING_SESSION_MINUTES = 1; 
-3) int32_t USE_BME = true;
-4) int32_t BME_RECORD_PERIOD_SECONDS = 2;
+3) int32_t USE_ENV = true;
+4) int32_t ENV_RECORD_PERIOD_SECONDS = 2;
 
 // INDEPENDENT TIME VARIABLES (retrieve from host) USED BY RTC 
 5) int32_t SECOND;

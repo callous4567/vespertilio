@@ -36,7 +36,7 @@ static const int SD_SPI_RX_PIN = 12;// Yellow
 static const int SD_SPI_CSN_PIN = 13; // White 
 static const int SD_SPI_SCK_PIN = 14; // Blue
 static const int SD_SPI_TX_PIN =  15; // Green 
-static const int SD_BAUDRATE = 25*1000*1000; // 45*1000*1000; 
+static const int SD_BAUDRATE = 50*1000*1000; // 45*1000*1000; 
 
 // The hardware configuration for the SD card we're using. 
 static spi_t spis[] = {  // One for each SPI.
@@ -48,8 +48,8 @@ static spi_t spis[] = {  // One for each SPI.
         .sck_gpio = SD_SPI_SCK_PIN,
         .baud_rate = SD_BAUDRATE,  // The limitation here is SPI slew rate.
         .dma_isr = spi1_dma_isr,
-        .mosi_gpio_drive_strength = GPIO_DRIVE_STRENGTH_8MA,
-        .sck_gpio_drive_strength = GPIO_DRIVE_STRENGTH_8MA,
+        .mosi_gpio_drive_strength = GPIO_DRIVE_STRENGTH_4MA,
+        .sck_gpio_drive_strength = GPIO_DRIVE_STRENGTH_4MA,
         .set_drive_strength = true,
     }
 };

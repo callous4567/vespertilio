@@ -10,7 +10,41 @@
 #include "hardware/clocks.h"
 #include "hardware/irq.h"
 
-// free the rtc
+// the pin used to power the pullups used for I2C communication to not only the RTC, but also the VEML light sensing module from Vishay 
+static const int PULLUP_PIN = 10; // pin number 14, GPIO 10, on Version 4 of the PCB 
+
+static void enable_external_pulls(void) {
+
+    // set the pulls on the internals to off, too
+    gpio_set_pulls(RTC_SDA_PIN, false, false);
+    gpio_set_pulls(RTC_SCK_PIN, false, false);
+    gpio_set_pulls(RTC_INT_PIN, false, false);
+
+    // configure the external pullup setup 
+    gpio_set_pulls(PULLUP_PIN, false, false);
+    gpio_init(PULLUP_PIN);
+    gpio_set_dir(PULLUP_PIN, GPIO_OUT);
+    gpio_put(PULLUP_PIN, 1);
+    gpio_set_drive_strength(PULLUP_PIN, GPIO_DRIVE_STRENGTH_8MA);
+    busy_wait_ms(100); // for capacitor inrush 
+    
+
+}
+static void disable_external_pulls(void) {
+
+    // pull all the pins down by default
+    gpio_set_pulls(RTC_SDA_PIN, false, true);
+    gpio_set_pulls(RTC_SCK_PIN, false, true);
+    gpio_set_pulls(RTC_INT_PIN, false, true);
+
+    // disable the external pullup setup 
+    gpio_put(PULLUP_PIN, 0);
+    gpio_deinit(PULLUP_PIN);
+    gpio_set_pulls(PULLUP_PIN, false, true);
+
+}
+
+// free the rtc (and turn of all the external pullups in the process)
 void rtc_free(ext_rtc_t* EXT_RTC) {
 
     i2c_deinit(EXT_RTC->hw_inst); // deinit the i2c instance (v. important.)
@@ -18,6 +52,7 @@ void rtc_free(ext_rtc_t* EXT_RTC) {
     free(EXT_RTC->alarmbuf);
     free(EXT_RTC->fullstring);
     free(EXT_RTC);
+    disable_external_pulls(); // disable the pullup setup 
 
 }
 
@@ -213,6 +248,9 @@ static void rtc_register_write(
 // Initialize the RTC object default. Returns it. MALLOC!!!!
 ext_rtc_t* init_RTC_default(void) {
 
+    // set all internal pulls to off since we are using external pullups 
+    enable_external_pulls();
+
     // set up rtc object 
     ext_rtc_t *EXT_RTC;
     EXT_RTC = (ext_rtc_t*)malloc(sizeof(ext_rtc_t));
@@ -232,16 +270,14 @@ ext_rtc_t* init_RTC_default(void) {
     gpio_set_function(EXT_RTC->sda, GPIO_FUNC_I2C);
     gpio_set_function(EXT_RTC->scl, GPIO_FUNC_I2C);
 
-    // set internal pulls (REV 4 requires this since we do not do the external pullups.) TODO VER 4: Pullup bank to a GPIO w/ 10K pullups. Internals aren't enough.
-    gpio_set_pulls(RTC_SDA_PIN, false, false);
-    gpio_set_pulls(RTC_SCK_PIN, false, false);
-    gpio_set_pulls(RTC_INT_PIN, false, false);
-
     // malloc up the timebuf too (7 bytes. See datasheet top-down of registers.)
     EXT_RTC->timebuf = (uint8_t*)malloc(7);
 
     // malloc up the alarmbuf too
     EXT_RTC->alarmbuf = (uint8_t*)malloc(4);
+
+    // set all internal pulls to off since we are using external pullups 
+    enable_external_pulls();
 
     // SET DEFAULT CONTROL REGISTER 
 
@@ -265,6 +301,7 @@ ext_rtc_t* init_RTC_default(void) {
         RTC_DEFAULT_CONTROL_ptr,
         1
     );
+
 
     // SET DEFAULT TRICKLE REGISTER 
 

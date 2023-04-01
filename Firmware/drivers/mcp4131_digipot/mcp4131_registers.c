@@ -3,8 +3,7 @@
 // pins 
 const int32_t DPOT_SCK_PIN = 18;
 const int32_t DPOT_MOSI_PIN = 19;
-const int32_t DPOT_CSN_PRIMARY = 17; // first digipot on the cascade 
-const int32_t DPOT_CSN_SECONDARY = 21; // second on the cascade 
+const int32_t DPOT_CSN = 17; // first digipot on the cascade 
 const int32_t DPOT_MISO_PIN = 16;
 
 /*

@@ -1,5 +1,6 @@
 # Set minimum required version of CMake
 cmake_minimum_required(VERSION 3.12)
+# set(CMAKE_BUILD_TYPE "Release")
 
 # Include build functions from Pico SDK
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
@@ -17,6 +18,7 @@ project(SRAM_SD_Testing C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
+
 # Tell CMake where to find the executable source file
 add_executable(${PROJECT_NAME} 
     SRAM_SD_Testing.cpp
@@ -31,6 +33,8 @@ add_executable(${PROJECT_NAME}
     drivers/mcp4131_digipot/spi_driver.c
     drivers/bme280/bme280_spi.c
     drivers/pico_usb_configure/vespertilio_usb_int.c
+    drivers/veml/i2c_driver.c 
+    drivers/veml/veml_registers.c
 )
 
 # Create map/bin/hex/uf2 files
@@ -58,6 +62,7 @@ target_link_libraries(${PROJECT_NAME}
     hardware_irq
     hardware_uart
     hardware_pio
+    hardware_pwm
 )
 
 # Enable UART and USB
