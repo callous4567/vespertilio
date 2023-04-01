@@ -16,21 +16,13 @@ This is my first time with C (embedded or otherwise) and with a bunch of other t
 - Competitive BOM cost: roughly £40 as of Ver 4 without the weather sensor addon, which adds about £10 to the final cost.
 - USB configurable recording schedules using desktop .exe and .json. **WIP**, allow for setting sampling frequency with each session, too, and make a GUI for configuration. **WIP**, also set the firmware over USB without having to toggle bootsel on the Pico. 
 - Same form factor, microphone positioning, as Audiomoth, giving compatibility with Audiomoth cases.
-- **WIP**, provided case designs can be 3D printed appropriately to provide waterproof (weatherproof with weather sensor- it compromises the waterproof seal) sealed case for the device, allowing use in all usual environments 
-- **WIP**, power usage is roughly 30 mA at 192 kHz and 60 mA at 480 kHz. Aiming to reduce (by modifying system and SPI clock against ADC clock requirement) power usage.
-
 
 ## Todo/current
-- Clean up schematics, BOM, etc, for V7. PCBs 
-- Designing 3D weatherproof casings for vespertilio, BME attachment, and BME USB-SPI interface. *The concept is done- just need time to modify current designs.*
-- Cleaning up main body C code and optimization, alongside changing clock settings. *Need time.*
+- Weatherproof case designs (for V6, V5 done and worked fine.) 
+- Awaiting V6. PCBs delivery for testing (latest.)
+- Clean up schematics, BOM, etc, for V7. PCBs (distant.)
+- Cleaning up main body C code and optimization, alongside changing clock settings (distant.)
 - Planning for process on characterizing recording capabilities and specification w.r.t directionality, sensitivity, etc. *Need bats, an ultrasonic audio source, and somewhere quiet.*
-
-
-
-![](https://github.com/callous4567/Batcorder/blob/main/VER_3_EX.jpg)
-^*just the example I'm currently programming on, the third version of the PCB! The strange orange glob is a ball of kapton tape encasing a MAX8510, testing the disabling & desoldering/removal of the onboard DC-DC converter of the Pi Pico to improve noise performance (just disabling it isn't enough- you have to remove it completely for it to be extra effective. It works great, btw!*
-
 
 
 ![](https://github.com/callous4567/vespertilio/blob/main/current_pcbs.jpg)
