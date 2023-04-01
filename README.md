@@ -15,6 +15,7 @@ This is my first time with C (embedded or otherwise) and with a bunch of other t
 - Supercapacitor on RTC allows upwards of 15 minutes to exchange batteries without losing timing configuration- no need to reconfigure after re-batterying... battery-re.. whatever!
 - Competitive BOM cost: roughly £40 as of Ver 4 without the weather sensor addon, which adds about £10 to the final cost.
 - USB configurable recording schedules using desktop .exe and .json. **WIP**, allow for setting sampling frequency with each session, too, and make a GUI for configuration. **WIP**, also set the firmware over USB without having to toggle bootsel on the Pico. 
+- Same form factor, microphone positioning, as Audiomoth, giving compatibility with Audiomoth cases.
 - **WIP**, provided case designs can be 3D printed appropriately to provide waterproof (weatherproof with weather sensor- it compromises the waterproof seal) sealed case for the device, allowing use in all usual environments 
 - **WIP**, power usage is roughly 30 mA at 192 kHz and 60 mA at 480 kHz. Aiming to reduce (by modifying system and SPI clock against ADC clock requirement) power usage.
 
