@@ -4,9 +4,7 @@
 
 #include "ext_rtc_registers.h"
 #include "hardware/i2c.h"
-#include "hardware/rtc.h" // for the sake of interfacing with the pico RTC 
-//#include "pico/stdio_usb.h"
-//#include "pico/stdio_uart.h"
+#include "hardware/rtc.h" 
 
 typedef struct {
 

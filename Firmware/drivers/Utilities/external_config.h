@@ -16,9 +16,6 @@ extern const int32_t TIME_VEML_BME_STRINGSIZE;
 extern bool USE_ENV;
 extern int32_t* configuration_buffer_external;
 
-// Define ADC pin and buffer size (non-configurated constant.)
-const extern int32_t ADC_PIN;
-
 // set configuration_buffer_external from the flash (free configuration_buffer_external later.) set independent unchanging variables. return NUMBER_OF_ALARMS.
 void flash_read_to_configuration_buffer_external(void);
 

@@ -1,11 +1,7 @@
 #include "ext_rtc_registers.h"
 
 // Note the presence of the interrupt pin for this particular RTC
-const int RTC_INT_PIN = 7;
-const int RTC_SDA_PIN = 8;
-const int RTC_SCK_PIN = 9;
 const int RTC_BAUD = 400000;
-i2c_inst_t* RTC_I2C = i2c0;
 
 // The address of the RTC. 0x68. The I2C bus handles the addition of the read or write bits (1 and 0.) 
 const uint8_t RTC_SLAVE_ADDRESS = 0b1101000;

@@ -1,7 +1,9 @@
-#include "../mSD/mSD.h"
-#include "../ext_rtc/ext_rtc.h"
-#include "../veml/i2c_driver.h"
-
+extern "C" {
+    #include "../mSD/mSD.h"
+    #include "../ext_rtc/ext_rtc.h"
+    #include "../veml/i2c_driver.h"
+    #include "../Utilities/pinout.h"
+}
 
 
 /*

@@ -259,8 +259,8 @@
 /  bit1=1: Do not trust last allocated cluster number in the FSINFO.
 */
 
-// set to 2 (environmental data file + audio data file.)
-#define FF_FS_LOCK		2
+// set to 3 (environmental data file + audio data file + debug file.)
+#define FF_FS_LOCK		3
 /* The option FF_FS_LOCK switches file lock function to control duplicated file open
 /  and illegal operation to open objects. This option must be 0 when FF_FS_READONLY
 /  is 1.

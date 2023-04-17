@@ -44,8 +44,8 @@ The end value, CONFIG_SUCCESS, should be set to unity.
 // INDEPENDENT VARIABLES FOR RECORDING SPECIFICS: CONFIGURATION_BUFFER_INDEPENDENT_VALUES of them: set recording parameters.
 0)                                                                              int32_t ADC_SAMPLE_RATE = 192000;               
 1)                                                                              int32_t RECORDING_LENGTH_SECONDS = 30;           
-2)                                                                              int32_t USE_BME = true;                         
-3 = CONFIGURATION_BUFFER_INDEPENDENT_VALUES - 1)                                int32_t BME_RECORD_PERIOD_SECONDS = 2;           
+2)                                                                              int32_t USE_ENV = true;                         
+3 = CONFIGURATION_BUFFER_INDEPENDENT_VALUES - 1)                                int32_t ENV_RECORD_PERIOD_SECONDS = 2;           
 
 // INDEPENDENT TIME VARIABLES- 7 of them. USED BY RTC starting from zero-based index CONFIGURATION_BUFFER_INDEPENDENT_VALUES total of CONFIGURATION_RTC_INDEPENDENT_VALUES
 CONFIGURATION_BUFFER_INDEPENDENT_VALUES)                                        int32_t SECOND;
@@ -151,6 +151,7 @@ def do_handshake():
     if u == "Thanks.":
         print("vespertilio gives us a", u)
     else:
+        print(u)
         raise ValueError("No thanks given... we've failed in confirming our affections.")
 
 
@@ -172,8 +173,8 @@ def prepare_dictionary():
     # INDEPENDENT VARIABLES FOR RECORDING SPECIFICS: CONFIGURATION_BUFFER_INDEPENDENT_VALUES of them: set recording parameters.
     ordered_dictionary['ADC_SAMPLE_RATE'] = json_config['ADC_SAMPLE_RATE']
     ordered_dictionary['RECORDING_LENGTH_SECONDS'] = json_config['RECORDING_MINUTES_PER_SUBRECORDING']*60
-    ordered_dictionary['USE_BME'] = json_config['USE_BME']
-    ordered_dictionary['BME_RECORD_PERIOD_SECONDS'] = json_config['BME_PERIOD_SECONDS']
+    ordered_dictionary['USE_ENV'] = json_config['USE_ENV']
+    ordered_dictionary['ENV_RECORD_PERIOD_SECONDS'] = json_config['ENV_PERIOD_SECONDS']
 
     """
     tm_year: 2023, ex. REMOVE THE 20, ONLY NEED LAST 2 DIGITS

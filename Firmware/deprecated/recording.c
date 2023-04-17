@@ -309,11 +309,11 @@ static recording_multicore_struct_t* audiostruct_generate(void) {
     multicore_struct->mSD->fp_audio_filename = (char*)malloc(26); // 22 bytes for the time fullstring, then 4 bytes for .wav 
 
     // Set up pointers for the BME too (and init it.)
-    if (USE_BME==true) {
+    if (USE_ENV==true) {
 
         // Datastring/timestring/init 
         multicore_struct->BME_DATASTRING = (char*)malloc(20); // 20 bytes for the BME data 
-        multicore_struct->BME_AND_TIME_STRING = (char*)malloc(45); // 20 bytes + 22 RTC bytes + 2 byte spacer + 1 byte newline 
+        multicore_struct->ENV_AND_TIME_STRING = (char*)malloc(45); // 20 bytes + 22 RTC bytes + 2 byte spacer + 1 byte newline 
     
         // The microSD pointers too.
         multicore_struct->mSD->fp_env = (FIL*)malloc(sizeof(FIL));
@@ -366,7 +366,7 @@ static void init_wav_file(recording_multicore_struct_t* multicore_struct) {
 }
 
 // initialize the BME text file for the current time taken from the RTC and open it for writing. Note that this assumes you have already gotten the EXT_RTC fullstring (you should have, for init_wav.)
-static void init_bme_file(recording_multicore_struct_t* multicore_struct) {
+static void init_env_file(recording_multicore_struct_t* multicore_struct) {
 
     // Generate a string with the time at the front and .wav on the end: fullstring is maximum of 22 bytes, .env is 4 bytes, .txt is 4 bytes, making 30
     snprintf(
@@ -405,7 +405,7 @@ static void inline bmetimestring_generate(recording_multicore_struct_t* multicor
 
     // snprintf what we want.
     snprintf(
-        multicore_struct->BME_AND_TIME_STRING,
+        multicore_struct->ENV_AND_TIME_STRING,
         45,
         "%s_%s\n", 
         multicore_struct->EXT_RTC->fullstring,
@@ -418,7 +418,7 @@ static void inline bmetimestring_generate(recording_multicore_struct_t* multicor
 static void inline bmetimestring_puts(recording_multicore_struct_t* multicore_struct) {
 
     // try to write it 
-    int was_it_a_success = f_puts(multicore_struct->BME_AND_TIME_STRING, multicore_struct->mSD->fp_env);
+    int was_it_a_success = f_puts(multicore_struct->ENV_AND_TIME_STRING, multicore_struct->mSD->fp_env);
     if (was_it_a_success<0) {
         panic("Failed writing BME data to file!!!");
     }
@@ -439,7 +439,7 @@ void run_wav_bme_sequence(void) {
 
     // Set up the ADC and the BME if we are to use it. 
     setup_adc();
-    if (USE_BME==true) {
+    if (USE_ENV==true) {
         setup_bme();
     }
 
@@ -449,8 +449,8 @@ void run_wav_bme_sequence(void) {
 
         // initiate the wav file + BME if we are to use it
         init_wav_file(test_struct);
-        if (USE_BME==true) {
-            init_bme_file(test_struct);
+        if (USE_ENV==true) {
+            init_env_file(test_struct);
         }
 
         // launch core 1
@@ -492,7 +492,7 @@ void run_wav_bme_sequence(void) {
         */
 
         // generate the bme timestring 
-        if (USE_BME==true) {
+        if (USE_ENV==true) {
             bmetimestring_generate(test_struct);
         }
 
@@ -517,7 +517,7 @@ void run_wav_bme_sequence(void) {
             );
 
             // assume the write has been finished + try to write the appropriate string to the BME file. 
-            if (USE_BME==true) {
+            if (USE_ENV==true) {
                 if (i%BME_RECORD_PERIOD_CYCLES==0) {
                     bmetimestring_puts(test_struct);
                 }
@@ -533,7 +533,7 @@ void run_wav_bme_sequence(void) {
             );
 
             // while buffer A is populated, check to see if we need to record environment data. if we do, then read it to the test_struct buffer. This will double-up for cycle 0 but whatever.
-            if (USE_BME==true) {
+            if (USE_ENV==true) {
                 if (i%BME_RECORD_PERIOD_CYCLES==0) {
 
                     // generate the bme timestring
@@ -558,7 +558,7 @@ void run_wav_bme_sequence(void) {
         if (FR_OK != fr) {
             printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
         }
-        if (USE_BME==true) {
+        if (USE_ENV==true) {
             fr = f_close(test_struct->mSD->fp_env);
             if (FR_OK != fr) {
                 printf("f_close error environmental: %s (%d)\n", FRESULT_str(fr), fr);

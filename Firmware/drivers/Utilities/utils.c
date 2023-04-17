@@ -1,11 +1,6 @@
 #include "utils.h"
 #include "hardware/pwm.h"
-
-
-// Consts for the enable pins 
-static const int32_t DIGI_ENABLE = 6; // pull low to make gate-source negative + enable PFET 
-static const int32_t ANA_ENABLE = 22; // pull high to enable analogue with conventional load switch
-
+#include "pinout.h"
 
 /**
  * We will slowly ramp up to 3V3 using PWM duty cycle @ the full 125 MHz (this will introduce ripple into 3V3 of the MAX8510, but it should be fine)
@@ -19,14 +14,14 @@ void digi_enable(void) {
     gpio_deinit(DIGI_ENABLE);
     gpio_init(DIGI_ENABLE);
     gpio_set_dir(DIGI_ENABLE, GPIO_OUT);
-    gpio_put(DIGI_ENABLE, 0);
+    gpio_put(DIGI_ENABLE, 1);
     busy_wait_ms(100); // for capacitor inrush 
     
 }
 void digi_disable(void) {
     gpio_init(DIGI_ENABLE);
     gpio_set_dir(DIGI_ENABLE, GPIO_OUT);
-    gpio_put(DIGI_ENABLE, 1);
+    gpio_put(DIGI_ENABLE, 0);
     gpio_set_drive_strength(DIGI_ENABLE, GPIO_DRIVE_STRENGTH_4MA);
 }
 void ana_enable(void) {

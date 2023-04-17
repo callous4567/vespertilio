@@ -2,7 +2,7 @@
 #define MCP4131_SPI
 
 #include "mcp4131_registers.h"
-#include "hardware/spi.h"
+#include "../Utilities/pinout.h"
 
 typedef struct {
 

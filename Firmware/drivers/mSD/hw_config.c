@@ -48,8 +48,8 @@ static spi_t spis[] = {  // One for each SPI.
         .sck_gpio = SD_SPI_SCK_PIN,
         .baud_rate = SD_BAUDRATE,  // The limitation here is SPI slew rate.
         .dma_isr = spi1_dma_isr,
-        .mosi_gpio_drive_strength = GPIO_DRIVE_STRENGTH_4MA,
-        .sck_gpio_drive_strength = GPIO_DRIVE_STRENGTH_4MA,
+        .mosi_gpio_drive_strength = GPIO_DRIVE_STRENGTH_2MA,
+        .sck_gpio_drive_strength = GPIO_DRIVE_STRENGTH_2MA,
         .set_drive_strength = true,
     }
 };

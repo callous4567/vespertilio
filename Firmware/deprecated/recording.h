@@ -45,7 +45,7 @@ typedef struct {
 
     // BME pointers, too 
     char* BME_DATASTRING;    // bme 20-byte datastring with humidity_pressure_temperature in RH%_pascal_celsius 
-    char* BME_AND_TIME_STRING; // 20 byte BME_DATASTRING + the 22 byte EXT_RTC fullstring + a 2-byte "_" spacer + a 1-byte \n newline.
+    char* ENV_AND_TIME_STRING; // 20 byte BME_DATASTRING + the 22 byte EXT_RTC fullstring + a 2-byte "_" spacer + a 1-byte \n newline.
 
 
 } recording_multicore_struct_t; 

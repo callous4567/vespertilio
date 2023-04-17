@@ -3,19 +3,20 @@ extern "C" {
 #include "drivers/Utilities/external_config.h"
 #include "drivers/mSD/mSD.h"
 #include "drivers/ext_rtc/ext_rtc.h"
-#include "drivers/recording/recording_singlethread.h"
 #include "drivers/mcp4131_digipot/spi_driver.h"
 #include "drivers/bme280/bme280_spi.h"
 #include "drivers/pico_usb_configure/vespertilio_usb_int.h"
 #include "drivers/veml/i2c_driver.h"
+#include "drivers/Utilities/pinout.h"
 }
 #include "hardware/vreg.h"
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
 #include "hardware/adc.h"
+#include "drivers/recording/recording_singlethread.h"
 
 
-#define PLL 200000
+//#define PLL 200000
 
 /*
 
@@ -48,13 +49,17 @@ int main() {
     stdio_init_all(); // initialize STDIO for debugging + USB configuration
     digi_enable(); // initialize digital assembly for RTC/etc pullups by default 
     ana_enable(); // ensure analogue is disabled 
-
+    //ext_rtc_t* EXT_RTC = init_RTC_default();
+    //rtc_sleep_until_alarm(EXT_RTC);
+    
     debug_init_LED(); // initialize debug LED 
     dpot_dual_t* DPOT = init_dpot(); // set up gains 
     dpot_set_gain(DPOT, 20);
     deinit_dpot(DPOT);
     default_variables();  
+    printf("Starting test recording session!\r\n");
     run_wav_bme_sequence_single(); // run the BME sequence (which will self-free) 
+    
 
     /*
     int32_t success = usb_configurate(); // attempt USB configuration... returns either (0) for panic/failed, (1) for success, or (2) for handshake failed...

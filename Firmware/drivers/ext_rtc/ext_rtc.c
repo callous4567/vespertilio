@@ -10,9 +10,6 @@
 #include "hardware/clocks.h"
 #include "hardware/irq.h"
 
-// the pin used to power the pullups used for I2C communication to not only the RTC, but also the VEML light sensing module from Vishay 
-static const int PULLUP_PIN = 10; // pin number 14, GPIO 10, on Version 4 of the PCB 
-
 static void enable_external_pulls(void) {
 
     // set the pulls on the internals to off, too
@@ -306,9 +303,10 @@ ext_rtc_t* init_RTC_default(void) {
     // SET DEFAULT TRICKLE REGISTER 
 
     /*
-    0b10101001 - ONE DIODE 200 OHM RESISTOR 
-    3.3 V - ~1V / 200 ~ mA charging of the RTC supercapacitor 
-    Necessary to reduce inflow current.
+    We need to use 2k resistor arrangement.
+    No diode will be used 
+    Set to 1 0 1 0 0 1 1 0 No diode, 2kΩ resistor
+    0b10100110 
     */
 
     uint8_t RTC_DEFAULT_TRICKLE = 0b00000110;

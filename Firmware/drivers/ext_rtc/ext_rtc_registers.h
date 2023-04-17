@@ -1,13 +1,10 @@
 #ifndef EXT_RTC_REGS
 #define EXT_RTC_REGS
 
-#include "hardware/i2c.h"
+#include "../Utilities/pinout.h"
 
 // Note the presence of the interrupt pin for this particular RTC
-extern const int RTC_INT_PIN,
-RTC_SDA_PIN,
-RTC_SCK_PIN,
-RTC_BAUD;
+extern const int RTC_BAUD;
 
 // And the i2c 
 extern i2c_inst_t* RTC_I2C;

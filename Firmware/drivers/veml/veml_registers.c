@@ -1,11 +1,8 @@
 #include "veml_registers.h"
+#include "../Utilities/pinout.h"
 
 // pins/i2c same as RTC 
-const int32_t VEML_INT_PIN = 7;
-const int32_t VEML_SDA_PIN = 8;
-const int32_t VEML_SCK_PIN = 9;
 const int32_t VEML_BAUD = 400000;
-i2c_inst_t* VEML_I2C = i2c0;
 
 /*
 https://datasheet.lcsc.com/lcsc/1811101814_Vishay-Intertech-VEML6040A3OG_C78465.pdf

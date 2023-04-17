@@ -9,6 +9,7 @@ include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 include($ENV{PICO_EXTRAS_PATH}/external/pico_extras_import.cmake)
 
 # Creates a pico-sdk subdirectory in our project for the libraries
+set(PICO_CXX_ENABLE_EXCEPTIONS 1)
 pico_sdk_init()
 
 add_subdirectory(drivers/FatFs_SPI build)
@@ -28,13 +29,14 @@ add_executable(${PROJECT_NAME}
     drivers/mSD/hw_config.c
     drivers/ext_rtc/ext_rtc_registers.c 
     drivers/ext_rtc/ext_rtc.c 
-    drivers/recording/recording_singlethread.c
+    drivers/recording/recording_singlethread.cpp
     drivers/mcp4131_digipot/mcp4131_registers.c
     drivers/mcp4131_digipot/spi_driver.c
     drivers/bme280/bme280_spi.c
     drivers/pico_usb_configure/vespertilio_usb_int.c
     drivers/veml/i2c_driver.c 
     drivers/veml/veml_registers.c
+    drivers/Utilities/pinout/v5.c
 )
 
 # Create map/bin/hex/uf2 files

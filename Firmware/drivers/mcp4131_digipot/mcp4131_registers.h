@@ -1,14 +1,7 @@
 #ifndef MCP4131_REGS
 #define MCP4131_REGS
 
-#include "hardware/spi.h"
-
-extern const int32_t DPOT_SCK_PIN,
-DPOT_MOSI_PIN,
-DPOT_CSN,
-DPOT_MISO_PIN;
-
-extern spi_inst_t* DPOT_SPI;
+#include <stdint.h>
 
 extern int32_t DPOT_BAUD;
 

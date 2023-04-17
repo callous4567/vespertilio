@@ -1,9 +1,4 @@
-#include "hardware/gpio.h"
 #include "../Utilities/utils.h"
-#include <malloc.h>
-#include <string.h>
-#include <stdbool.h>
-#include <stdint.h>
 #include "i2c_driver.h"
 
 /*
@@ -15,6 +10,8 @@ You should init it, then deinit it, even if not using it,
 That ensures it's turned off (since by default, it's on- deinit/free(VEML) will set config to OFF.
 
 */
+static const int32_t VEML_STRINGSIZE = 29; // 4*5 byte char, four spacers (4*2), then one sens char, makes 29. 
+static const int32_t VEML_DEFAULT_SENSITIVITY = 5; // 1280 ms 
 
 // write a single data byte (16 bit) to the VEML at the given command register
 static void veml_write(veml_t* VEML, uint8_t command, uint16_t data_byte) {
@@ -41,11 +38,11 @@ static void veml_read(veml_t* VEML, uint8_t command, uint16_t* read_value) {
 
 }
 
-// write the default configuration *WITH* the provided integration period (decimals 0 to 5)
-void veml_default_configuration_write(veml_t* VEML, int32_t integration_time) {
+// write the default configuration *WITH* VEML->sensint integration time 
+void veml_default_configuration_write(veml_t* VEML) {
 
     uint16_t config = 0x00;
-    config |= (integration_time << 4);
+    config |= (VEML->sensint << 4);
     veml_write(VEML, VEML_CONF, config);
 
 }
@@ -59,6 +56,7 @@ veml_t* init_VEML_default(void) {
     VEML->scl = VEML_SCK_PIN;
     VEML->hw_inst = VEML_I2C;
     VEML->baudrate = VEML_BAUD;
+    VEML->sensint = VEML_DEFAULT_SENSITIVITY;
 
     /*
     // i2c setup (skip this here, as the RTC has the same init already done.)
@@ -70,32 +68,33 @@ veml_t* init_VEML_default(void) {
 
     // Malloc up the buffers
     VEML->colbuf = (uint16_t*)malloc(4);
-    VEML->colstring = (char*)malloc(26*sizeof(char));
+    VEML->colstring = (char*)malloc(VEML_STRINGSIZE*sizeof(char));
 
-    // do the default configuration (all 0x00 / 40ms recording)
-    veml_default_configuration_write(VEML, 5);
+    // write configuration with VEML->sensint sensitivity + other defaults.
+    veml_default_configuration_write(VEML);
 
     // return 
     return VEML;
 
 }
 
-// read RGBW to the buffer *and* generate the appropriate string (26 chars/bytes max)
+// read RGBW to the buffer *and* generate the appropriate string (29 chars/bytes max)
 void veml_read_rgbw(veml_t* VEML) {
 
-    veml_read(VEML, VEML_R, VEML->colbuf);
-    veml_read(VEML, VEML_G, VEML->colbuf+1);
-    veml_read(VEML, VEML_B, VEML->colbuf+2);
-    veml_read(VEML, VEML_W, VEML->colbuf+3);
+    veml_read(VEML, VEML_R, VEML->colbuf); // 5 chars 
+    veml_read(VEML, VEML_G, VEML->colbuf+1); // 5 chars 
+    veml_read(VEML, VEML_B, VEML->colbuf+2); // 5 chars 
+    veml_read(VEML, VEML_W, VEML->colbuf+3); // 5 chars 
     snprintf(
         VEML->colstring,
-        26,
-        "%d_%d_%d_%d",
+        VEML_STRINGSIZE,
+        "%d_%d_%d_%d_%d",
         *(VEML->colbuf),
         *(VEML->colbuf+1),
         *(VEML->colbuf+2),
-        *(VEML->colbuf+3)
-    );
+        *(VEML->colbuf+3),
+        VEML->sensint
+    ); // 20 chars + four underscores (_) + one final sensitivity char for 29 chars total 
 
 }
 

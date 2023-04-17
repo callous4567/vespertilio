@@ -1,10 +1,5 @@
 #include "mcp4131_registers.h"
-
-// pins 
-const int32_t DPOT_SCK_PIN = 18;
-const int32_t DPOT_MOSI_PIN = 19;
-const int32_t DPOT_CSN = 17; // first digipot on the cascade 
-const int32_t DPOT_MISO_PIN = 16;
+#include "../Utilities/pinout.h"
 
 /*
 Quick design note about our cascaded op-amp.
@@ -24,9 +19,6 @@ as the feedback
 In this case, the gain is equal to -(P0B - W)/(W - P0A)
 
 */
-
-// the spi instance 
-spi_inst_t* DPOT_SPI = spi0;
 
 // baud 
 int32_t DPOT_BAUD = 50*1000;

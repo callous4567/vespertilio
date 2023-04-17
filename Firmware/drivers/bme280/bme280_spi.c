@@ -8,6 +8,10 @@
 
 #include "bme280_spi.h"
 #include "malloc.h"
+#include <stdio.h>
+#include "pico/stdlib.h"
+#include "pico/binary_info.h"
+#include "../Utilities/pinout.h"
 /* Example code to talk to a bme280 humidity/temperature/pressure sensor.
    NOTE: Ensure the device is capable of being driven at 3.3v NOT 5v. The Pico
    GPIO (and therefore SPI) cannot be used at 5v.
@@ -31,15 +35,8 @@
 
 #define READ_BIT 0x80
 
-// define pinout 
-static const int32_t BME_CS_PIN = 5;
-static const int32_t BME_MOSI_PIN = 3;
-static const int32_t BME_MISO_PIN = 4;
-static const int32_t BME_SCK_PIN = 2;
-
 // define baudrate and spi 
 static const int32_t BME_BAUD = 10*1000*1000;
-static spi_inst_t* BME_HW_INST = spi0;
 
 int32_t t_fine;
 

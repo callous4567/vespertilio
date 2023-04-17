@@ -15,14 +15,19 @@ typedef struct {
     // file object structures for audio file + environment file 
     FIL *fp_audio;
     FIL *fp_env;
+    FIL *fp_debug;
 
     // bytes written 
     UINT *bw;
     UINT *bw_env;
+    UINT *bw_debug; 
 
     // filenames of the two files for data recording (the audio file and the environmental data file)
     char *fp_audio_filename;
     char *fp_env_filename;
+    char *fp_debug_filename;
+
+    
 
 } mSD_struct_t; 
 
