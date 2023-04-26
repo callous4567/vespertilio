@@ -29,7 +29,7 @@ int32_t ENV_RECORD_PERIOD_SECONDS = 5;
 
 // The !current! session settings + number of alarms. 
 int32_t RECORDING_SESSION_MINUTES = 5; // this is set from the configuration_buffer_external each and every session
-int32_t NUMBER_OF_ALARMS;
+int32_t NUMBER_OF_SESSIONS;
 
 // DEPENDENT VARIABLES (calculated from independent, thus undefined as of yet.)
 int32_t RECORDING_FILE_DATA_RATE_BYTES;
@@ -66,13 +66,13 @@ void set_dependent_variables(int32_t WHICH_ALARM_ONEBASED) {
 }
 
 /**
- * Sets all permanent constants for this recording day (not session) including the NUMBER_OF_ALARMS
+ * Sets all permanent constants for this recording day (not session) including the NUMBER_OF_SESSIONS
  * Call at start of recording day (not session.)
 */
 static void set_constant_independent_variables(void) {
 
     // Constant independent variables for this program
-    NUMBER_OF_ALARMS = *(configuration_buffer_external + CONFIGURATION_BUFFER_INDEPENDENT_VALUES + 7);
+    NUMBER_OF_SESSIONS = *(configuration_buffer_external + CONFIGURATION_BUFFER_INDEPENDENT_VALUES + 7);
     ADC_SAMPLE_RATE = *configuration_buffer_external;
     RECORDING_LENGTH_SECONDS = *(configuration_buffer_external+1); // note that BME files are matched to this recording length, too. 
     USE_ENV = (bool)*(configuration_buffer_external+2);

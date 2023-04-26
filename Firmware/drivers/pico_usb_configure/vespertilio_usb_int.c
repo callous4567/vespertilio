@@ -36,6 +36,8 @@ Which we can re-write to
 - Erase the sector located at XIP_BASE + CONFIG_FLASH_OFFSET
 - Write the page starting at XIP_BASE + CONFIG_FLASH_OFFSET
 
+Note that even if the BME is not present, the code will still run fine- the BME data will just be absent. Future me, future problems :) 
+
 */
 
 /*
@@ -46,7 +48,7 @@ CONFIGURATION_BUFFER_INDEPENDENT_VALUES     pertain to values that are static ov
 CONFIGURATION_RTC_INDEPENDENT_VALUES        pertain to values that are dynamic over the session (barring the first 7 values, which defined the initial state of the RTC at configuration.)
 
 CONFIGURATION_BUFFER_INDEPENDENT_VALUES     = 4                                                                                                              // subject to constant change based on features                
-CONFIGURATION_RTC_INDEPENDENT_VALUES        = 7 + 1 + 3*NUMBER_OF_ALARMS                                                                                     // where 7 is the RTC config and 1 is NUMBER_OF_ALARMS 
+CONFIGURATION_RTC_INDEPENDENT_VALUES        = 7 + 1 + 3*NUMBER_OF_SESSIONS                                                                                     // where 7 is the RTC config and 1 is NUMBER_OF_SESSIONS 
 CONFIGURATION_BUFFER_TOTAL_SIZE_BYTES       = FOUR BYTES (INT32_T!!!) * [CONFIGURATION_BUFFER_INDEPENDENT_VALUES + CONFIGURATION_RTC_INDEPENDENT_VALUES + 1] // where 1 has been added to account for CONFIG_SUCCESS
 CONFIGURATION_BUFFER_MAX_VARIABLES          = 64                                                                                                             // FLASH_PAGE_SIZE/sizeof(int32_t)
 
@@ -69,7 +71,7 @@ CONFIGURATION_BUFFER_INDEPENDENT_VALUES+4)                                      
 CONFIGURATION_BUFFER_INDEPENDENT_VALUES+5)                                      int32_t MONTH;
 CONFIGURATION_BUFFER_INDEPENDENT_VALUES+6)                                      int32_t YEAR;
 
-// INDEPENDENT TIME VARIABLES CONTINUED: CUSTOM TIME SCHEDULING FOR THE ALARM! There will be (3N+1) variables here, where the 1 is the "NUMBER_OF_ALARMS." Note that the RECORDING_SESSION_MINUTES must be defined for each alarm. 
+// INDEPENDENT TIME VARIABLES CONTINUED: CUSTOM TIME SCHEDULING FOR THE ALARM! There will be (3N+1) variables here, where the 1 is the "NUMBER_OF_SESSIONS." Note that the RECORDING_SESSION_MINUTES must be defined for each alarm. 
 CONFIGURATION_BUFFER_INDEPENDENT_VALUES+7)                                      int32_t NUMBER_OF_SESSIONS;
 CONFIGURATION_BUFFER_INDEPENDENT_VALUES+8)                                      int32_t ALARM_HOUR_1;
 CONFIGURATION_BUFFER_INDEPENDENT_VALUES+9)                                      int32_t ALARM_MINUTE_1;
@@ -86,9 +88,9 @@ CONFIGURATION_BUFFER_INDEPENDENT_VALUES + 7 + 3*WHICH_ALARM_ONEBASED            
 :                                                                               int32_t ...
 :                                                                               int32_t ...
 :                                                                               int32_t ...
-CONFIGURATION_BUFFER_INDEPENDENT_VALUES + 7 + 3*NUMBER_OF_ALARMS - 2)           int32_t ALARM_HOUR_NUMBER_OF_ALARMS;
-CONFIGURATION_BUFFER_INDEPENDENT_VALUES + 7 + 3*NUMBER_OF_ALARMS - 1)           int32_t ALARM_MINUTE_NUMBER_OF_ALARMS;
-CONFIGURATION_BUFFER_INDEPENDENT_VALUES + 7 + 3*NUMBER_OF_ALARMS)               int32_t RECORDING_SESSION_MINUTES_NUMBER_OF_ALARMS;
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES + 7 + 3*NUMBER_OF_SESSIONS - 2)           int32_t ALARM_HOUR_NUMBER_OF_SESSIONS;
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES + 7 + 3*NUMBER_OF_SESSIONS - 1)           int32_t ALARM_MINUTE_NUMBER_OF_SESSIONS;
+CONFIGURATION_BUFFER_INDEPENDENT_VALUES + 7 + 3*NUMBER_OF_SESSIONS)               int32_t RECORDING_SESSION_MINUTES_NUMBER_OF_SESSIONS;
 
 // Population of zeros
 :                                                                               int32_t host sets to zero
@@ -149,23 +151,14 @@ Execute following a handshake. Bool on whether host will send configuration data
 */
 static bool request_configuration(void) {
 
-    busy_wait_ms(1);
-
     printf("Configure vespertilio?\r\n"); 
-
-    busy_wait_ms(1); // wait for host to read + send confirm true int32
-
     char* acknowledged = (char*)malloc(4*sizeof(char));
     fgets(acknowledged, 5, stdin);
-    busy_wait_ms(1);
 
     if (strcmp(acknowledged, "true")==0) { // host "true" matches our "true" + we can continue configuration. double check though with host..
         
         free(acknowledged);
-        busy_wait_ms(1);
         printf("Thanks.\r\n");
-        busy_wait_ms(19);
-        flushbuf();
 
         return true;
 
@@ -183,7 +176,6 @@ retrieve the configuration array from the host. call this immediately after requ
 */ 
 static int32_t* download_configuration(void) {
 
-    busy_wait_ms(1000);
     // The configuration buffer: 15 int32_t objects. 
     int32_t* configuration_buffer = (int32_t*)malloc(CONFIGURATION_BUFFER_MAX_VARIABLES * sizeof(int32_t));
     *(configuration_buffer + CONFIGURATION_BUFFER_MAX_VARIABLES - 1) = (int32_t)0; // set default to a "failed transaction" zero
@@ -266,20 +258,15 @@ int usb_configurate(void) {
     if (handshake()) { // if handshake is true (success)
 
         if (request_configuration()) { // get the "true" from the host signifying it is sending data over.  takes about 30 ms tops after processing. 
-            flushbuf();
             int32_t* configuration_buffer = download_configuration(); // try to download the configuration. about 150-200 ms.
 
             if (*(configuration_buffer+CONFIGURATION_BUFFER_MAX_VARIABLES-1)==(int32_t)1) { // the host has written the correct CONFIG_SUCCESS variable
                 
-                flushbuf();
-                busy_wait_ms(10);
                 fwrite(configuration_buffer, 4, CONFIGURATION_BUFFER_MAX_VARIABLES, stdout); // write configuration back to host to verify no corruption
                 char* acknowledgement = (char*)malloc(10*sizeof(char)); // get acknowledgement from host that transfer had no corruption
                 fgets(acknowledgement, 11, stdin); // waits. you can use fgets to pace the program and wait for the host to confirm.
 
                 if (strcmp(acknowledgement,"Completed.")==0) { // acknowledged true- data isn't corrupted!
-
-                    busy_wait_ms(50);
                     
                     // write to flash the configuration uint8_t*
                     write_to_flash(configuration_buffer);

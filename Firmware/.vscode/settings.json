@@ -1,0 +1,4 @@
+{
+    "C_Cpp.errorSquiggles": "disabled",
+    "cortex-debug.gdbPath": "gdb-multiarch"
+}

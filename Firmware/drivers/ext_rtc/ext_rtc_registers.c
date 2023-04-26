@@ -26,16 +26,3 @@ const uint8_t RTC_ALARM_2_DAYDATES = 0x0D;
 const uint8_t RTC_CONTROL = 0x0E;
 const uint8_t RTC_STATUS = 0x0F;
 const uint8_t RTC_TRICKLE = 0x10;
-
-
-/* DEBUG
-
-7 6 5 GREEN BLUE RED INT SCL SDA 
-GREEN RED BLUE GPIO 7 8 9
-
-INT GPIO_7
-SCL GPIO_9
-SDA GPIO_8
-
-*/
-

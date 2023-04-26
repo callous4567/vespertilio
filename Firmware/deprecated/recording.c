@@ -83,7 +83,7 @@ static void write_BUF__SD(
     );
 
     if (*bw!=(*BUF_SIZE * 2)) {
-        panic("The bytes written does not equal double the uint16_t buffer size in write_BUF_A_SD in SRAM_SD_Testing.cpp. FUCK! %u, %u", *bw, 2*(*BUF_SIZE));
+        panic("The bytes written does not equal double the uint16_t buffer size in write_BUF_A_SD in vespertilio.cpp. FUCK! %u, %u", *bw, 2*(*BUF_SIZE));
     }
 
 }

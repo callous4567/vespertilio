@@ -15,53 +15,25 @@ extern "C" {
 #include "hardware/adc.h"
 #include "drivers/recording/recording_singlethread.h"
 
-
-//#define PLL 200000
-
 /*
 
-#define PLL 180000
+NOTE TO SELF IMPORTANT!!!
 
-    vreg_set_voltage(VREG_VOLTAGE_1_10);
-    set_sys_clock_khz(PLL, true);
-    clock_configure(
-            clk_peri,
-            0,                                                // No glitchless mux
-            CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, // System PLL on AUX mux
-            PLL*1000,                               // Input frequency
-            PLL*1000                                // Output (must be same as no divider)
-        );
-
-    digi_enable(); // initialize digital assembly for RTC/etc pullups by default 
+Super cap only handles 3v3 
+The RTC does not stop charging it at all
+It will charge until VCC - 0.7V 
+Consequently, with 4V5 batteries, that's 3.8V (0.5V above rating)
+Example^^^
+I recommend disabling trickle charge unless using rechargeable batteries (which will cap out around 4V-4.2V.) 
+Next PCB version, note our default setting (2k series resistor)
+Throw in a voltage divider circuit on our 
+*/
+int main() {
+    stdio_init_all(); // initialize STDIO for debugging + USB configuration
+    //digi_enable(); // initialize digital assembly for RTC/etc pullups by default 
     ana_disable(); // ensure analogue is disabled 
     debug_init_LED(); // initialize debug LED 
-    stdio_init_all(); // initialize STDIO for debugging + USB configuration
-
-    characterize_SD_write_time(4096);
-
-*/
-
-// Run a test of the SD functionality 
-
-int main() {
-
-    busy_wait_ms(1000);
-    stdio_init_all(); // initialize STDIO for debugging + USB configuration
-    digi_enable(); // initialize digital assembly for RTC/etc pullups by default 
-    ana_enable(); // ensure analogue is disabled 
-    //ext_rtc_t* EXT_RTC = init_RTC_default();
-    //rtc_sleep_until_alarm(EXT_RTC);
     
-    debug_init_LED(); // initialize debug LED 
-    dpot_dual_t* DPOT = init_dpot(); // set up gains 
-    dpot_set_gain(DPOT, 20);
-    deinit_dpot(DPOT);
-    default_variables();  
-    printf("Starting test recording session!\r\n");
-    run_wav_bme_sequence_single(); // run the BME sequence (which will self-free) 
-    
-
-    /*
     int32_t success = usb_configurate(); // attempt USB configuration... returns either (0) for panic/failed, (1) for success, or (2) for handshake failed...
 
     switch (success) 
@@ -76,7 +48,7 @@ int main() {
             flash_read_to_configuration_buffer_external(); // configure default from flash + get constant independent variables
 
             // iterate over the alarms...
-            for (int i = 1; i <= NUMBER_OF_ALARMS; i++) {
+            for (int i = 1; i <= NUMBER_OF_SESSIONS; i++) {
 
                 set_dependent_variables(i); // set the dependent variables for this alarm 
 
@@ -90,9 +62,11 @@ int main() {
                 dpot_set_gain(DPOT, 20);
                 deinit_dpot(DPOT);
 
+                // default_variables();  
+
                 run_wav_bme_sequence_single(); // run the BME sequence (which will self-free) 
 
-                busy_wait_ms(100000); // give a second for things to clean up on the mSD/etc.
+                busy_wait_ms(1000); // give a second for things to clean up on the mSD/etc.
 
                 ana_disable();
 
@@ -136,7 +110,7 @@ int main() {
 
     }
 
-    */
+    
     
     
 }

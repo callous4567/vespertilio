@@ -304,13 +304,13 @@ ext_rtc_t* init_RTC_default(void) {
 
     /*
     We need to use 2k resistor arrangement.
-    No diode will be used 
-    Set to 1 0 1 0 0 1 1 0 No diode, 2kΩ resistor
-    0b10100110 
+    Use a diode.
+    Result:
+    0b10101010 
     */
 
-    uint8_t RTC_DEFAULT_TRICKLE = 0b00000110;
-    uint8_t *RTC_DEFAULT_TRICKLE_ptr = &RTC_DEFAULT_CONTROL;
+    uint8_t RTC_DEFAULT_TRICKLE = 0b10101010;
+    uint8_t *RTC_DEFAULT_TRICKLE_ptr = &RTC_DEFAULT_TRICKLE;
 
     // write trickle register 
     rtc_register_write(

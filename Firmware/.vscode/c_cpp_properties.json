@@ -1,0 +1,26 @@
+{
+    "configurations": [
+        {
+            "name": "vespertilio",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${vcpkgRoot}/x64-windows/include",
+                "${vcpkgRoot}/x86-windows/include",
+                "C:/VSARM/sdk/pico/pico-sdk/src/common/pico_stdlib/include",
+                "C:/VSARM/sdk/pico/pico-sdk/**",
+                "C:/Users/Callicious/Documents/Prog/pycharm/EvaBatProject/pico-c-libraries/no-OS-FatFS/FatFs_SPI/include"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "windowsSdkVersion": "10.0.19041.0",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "windows-msvc-x64",
+            "configurationProvider": "ms-vscode.cmake-tools"
+        }
+    ],
+    "version": 4
+}

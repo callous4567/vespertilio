@@ -15,14 +15,13 @@ pico_sdk_init()
 add_subdirectory(drivers/FatFs_SPI build)
 
 # Set name of project (as PROJECT_NAME) and C/C   standards
-project(SRAM_SD_Testing C CXX ASM)
+project(vespertilio C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
-
 # Tell CMake where to find the executable source file
 add_executable(${PROJECT_NAME} 
-    SRAM_SD_Testing.cpp
+    vespertilio.cpp
     drivers/Utilities/utils.c
     drivers/Utilities/external_config.c
     drivers/mSD/mSD.c
@@ -68,8 +67,8 @@ target_link_libraries(${PROJECT_NAME}
 )
 
 # Enable UART and USB
-pico_enable_stdio_usb(${PROJECT_NAME} 0)
-pico_enable_stdio_uart(${PROJECT_NAME} 1)
+pico_enable_stdio_usb(${PROJECT_NAME} 1)
+pico_enable_stdio_uart(${PROJECT_NAME} 0)
 
 
 
