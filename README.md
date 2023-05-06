@@ -10,7 +10,6 @@ This is my first time with C (embedded or otherwise) and with a bunch of other t
 - Knowles Winfrey Microphone with Differential Amplifier -> Inverting Amplifier Cascade for audio (giving single-ended-equivalent gains minimum 220+!)
 - Vishay VEML6040A3OG to provide ambient light sensing of the environment
 - Variable gain on the inverting amplifier w/ fixed gain on the differential for better noise performance 
-- Low-power-standby of ~2mA dormancy when awaiting recording sessions (digital assembly and analogue disabled during standby.)
 - Compatible with usual MicroSD cards- Sandisk has been tested (16GB, 32GB, 64GB Ultra) to work fine at 480 kHz.
 - Supercapacitor on RTC allows upwards of 15 minutes to exchange batteries without losing timing configuration- no need to reconfigure after re-batterying... battery-re.. whatever!
 - Competitive BOM cost: roughly £50 as of Ver 6 inclusive of weather sensor, which adds about £10 to the final cost.
@@ -18,11 +17,10 @@ This is my first time with C (embedded or otherwise) and with a bunch of other t
 - Same form factor, microphone positioning, as Audiomoth, giving compatibility with Audiomoth cases.
 
 ## Todo/current
-- (Immediate) Weatherproof case designs (for V6+ Audiomoth Scale, V5 done and worked fine.) 
-- (Immediate) Clean up schematics, BOM, etc, for V7+. PCBs 
-- (Immediate) Cleaning up main body C code and optimization, alongside changing clock settings (distant.)
-- (Distant) Planning for process on characterizing recording capabilities and specification w.r.t directionality, sensitivity, etc. *Need bats, an ultrasonic audio source, and somewhere quiet.*
-- (Immediate) Testing whether digipot MCP4131 arrangement for variable gain introduces too much noise compared to classical PGA arrangement, being tested on PCB V7. 
+- (!!!Extremely immediate!!!) Coding V8 PCB arrangement, which has 16-bit MCP33131 500ksps ADC instead, and analogue PGA switch arrangement for gain control. 
+- (Delayed) Cleaning up main body C code and optimization, alongside changing clock settings (distant.)
+- (Delayed) Weatherproof case designs (for V6+ Audiomoth Scale, V5 done and worked fine.) 
+- (Delayed) Planning for process on characterizing recording capabilities and specification w.r.t directionality, sensitivity, etc. *Need bats, an ultrasonic audio source, and somewhere quiet.*
 
 ![](https://github.com/callous4567/vespertilio/blob/main/current_pcbs.jpg)
 ^*The current spread of PCBS and concept. vespertilio is optionally attached, by a USB-C connector manhandled into an SPI connector, to a weather module PCB.
