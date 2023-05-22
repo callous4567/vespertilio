@@ -5,18 +5,17 @@ extern "C" {
     #include "pico/multicore.h"
     #include "../bme280/bme280_spi.h"
     #include "hardware/adc.h"
+    #include "multicore_struct.h"
 }
 
-/**
- * ==================|
- * THREAD SAFETY NOTE|
- * ==================|
- * 
- * See sd_active_wait/sd_active_done
- * Need to be used before any and all file writing procedures (f_open/f_close/f_write/f_write_audiobuf/etc)
- * Otherwise, you will have assertion problems with the SD card.
- * Due to multicore, this is a necessity: it should not cost much in performance, though.
+/*
+TODO:
+- Remove the sd_active_wait/etc bit- we don't need thread safety for file write
+since we no longer write from core1 
+- Clean the hell up with the comments/etc... proper docstringing 
+- write the flashlog (from the previous session) to the debug file .txt, for convenience purposes.
 */
+
 static const int32_t ADC_BLOCKBUF_SIZE = 1024; // two SD card blocks (512 bytes*2.) 
 static const int32_t ADC_BLOCKTRANSFER_SIZE = ADC_BLOCKBUF_SIZE/4; // 256 samples -> 512 bytes -> one block 
 
@@ -24,6 +23,7 @@ static void init_dma_buf(recording_multicore_struct_single_t* multicore_struct) 
 
     // The buffer
     multicore_struct->ADC_BUFA = (int16_t*)malloc(ADC_BLOCKBUF_SIZE);
+    
     // Configure DMA channel from ADC to buffer A
     *multicore_struct->ADC_BUFA_CHAN = dma_claim_unused_channel(true);
     *multicore_struct->ADC_BUFA_CONF = dma_channel_get_default_config(*multicore_struct->ADC_BUFA_CHAN);
@@ -57,7 +57,6 @@ static void setup_adc(void) {
     adc_select_input(ADC_PIN - 26); // select input from appropriate input
     adc_clock_divisor();
     adc_fifo_setup(true, true, 1, false, false);
-    adc_run(false);
 }
 
 // write the 44-byte WAV header required for the .wave format (do this after opening file and initiating recording.)
@@ -192,6 +191,7 @@ static recording_multicore_struct_single_t* audiostruct_generate_single(void) {
     // Allocate everything for the ADC buffers (start addresses are programmed later, in init_dma_buf)
     multicore_struct->ADC_BUFA_CHAN = (int16_t*)malloc(sizeof(int16_t)); 
     multicore_struct->ADC_BUFA_CONF = (dma_channel_config*)malloc(sizeof(dma_channel_config)); 
+    multicore_struct->ADC_WHICH_HALF = (int8_t*)malloc(sizeof(int8_t));
 
     // Now allocate mSD pointers where appropriate
     multicore_struct->mSD = (mSD_struct_t*)malloc(sizeof(mSD_struct_t)); 
@@ -202,9 +202,12 @@ static recording_multicore_struct_single_t* audiostruct_generate_single(void) {
     multicore_struct->active = (bool*)malloc(sizeof(bool));
     *multicore_struct->active = false;
 
-    // Set up RTC
-    multicore_struct->EXT_RTC = (ext_rtc_t*)malloc(sizeof(ext_rtc_t));
-    multicore_struct->EXT_RTC = init_RTC_default();
+    // Set up RTC (or inherit it) 
+    if (USE_FLASHLOG) { 
+        multicore_struct->EXT_RTC = flashlog->EXT_RTC;
+    } else {
+        multicore_struct->EXT_RTC = init_RTC_default();
+    }
 
     // Set up pointers for the ENV too (and init it.) We do this after the RTC, because the VEML needs the RTC I2C to be running already. 
     if (USE_ENV==true) {
@@ -217,7 +220,7 @@ static recording_multicore_struct_single_t* audiostruct_generate_single(void) {
         multicore_struct->ENV_SLEEPING = (bool*)malloc(sizeof(bool));
 
         // Default VEML
-        multicore_struct->VEML = init_VEML_default();
+        multicore_struct->VEML = init_VEML_default(multicore_struct->EXT_RTC->mutex);
 
         // The microSD pointers too.
         multicore_struct->mSD->fp_env = (FIL*)malloc(sizeof(FIL));
@@ -229,7 +232,7 @@ static recording_multicore_struct_single_t* audiostruct_generate_single(void) {
     // Now the DMA chans
     init_dma_buf(multicore_struct);  // init the DMA/BUF configuration
 
-    // Finally also do the Debug file 
+    // Finally also do the Debug file (which we will use for writing down the previous log at the start of the session.)
     multicore_struct->mSD->fp_debug = (FIL*)malloc(sizeof(FIL));
     multicore_struct->mSD->fp_debug_filename = (char*)malloc(26);
     multicore_struct->mSD->bw_debug = (UINT*)malloc(sizeof(UINT));
@@ -255,6 +258,38 @@ static void inline sd_active_done(recording_multicore_struct_single_t* multicore
     *multicore_struct->active = false;
 }
 
+// create a log file to use for a given session (which will store anything we want to log. Just a standard .txt file.)
+static void init_debug_file(recording_multicore_struct_single_t* multicore_struct) {
+
+    // Read the current time + get string 
+    rtc_read_string_time(multicore_struct->EXT_RTC);
+
+    // Generate a string with the time at the front and .log on the end: fullstring is maximum of 22 bytes, .log is 4 bytes. 
+    snprintf(
+        multicore_struct->mSD->fp_debug_filename,
+        26,
+        "%s.log",
+        multicore_struct->EXT_RTC->fullstring
+    );
+
+    // Check if file exists 
+    FRESULT FR;
+    FILINFO FNO;
+
+    // Check if the file exists 
+    bool exists = SD_IS_EXIST(multicore_struct->mSD->fp_debug_filename);
+    if (exists) { // delete 
+        f_unlink(multicore_struct->mSD->fp_debug_filename);
+        custom_printf("The file %s exists- deleting.\r\n", multicore_struct->mSD->fp_debug_filename);
+    } 
+    
+    // Open the file with write access (FA_WRITE) with the read/write pointer at the start (FA_OPEN_ALWAYS)
+    FRESULT fr = f_open(multicore_struct->mSD->fp_debug, multicore_struct->mSD->fp_debug_filename, FA_OPEN_ALWAYS | FA_WRITE);
+    if (FR_OK != fr && FR_EXIST != fr)
+        panic("f_open(%s) error: %s (%d)\n", multicore_struct->mSD->fp_debug_filename, FRESULT_str(fr), fr);
+
+}
+
 // initialize the wav file for the current time taken from the RTC and open it for writing (writing the header.) 
 static void init_wav_file(recording_multicore_struct_single_t* multicore_struct) {
 
@@ -277,13 +312,13 @@ static void init_wav_file(recording_multicore_struct_single_t* multicore_struct)
     bool exists = SD_IS_EXIST(multicore_struct->mSD->fp_audio_filename);
     if (exists) { // delete 
         f_unlink(multicore_struct->mSD->fp_audio_filename);
-        printf("The file %s exists- deleting.\r\n", multicore_struct->mSD->fp_audio_filename);
     } 
     
     // Open the file with write access (FA_WRITE) with the read/write pointer at the start (FA_OPEN_ALWAYS)
     FRESULT fr = f_open(multicore_struct->mSD->fp_audio, multicore_struct->mSD->fp_audio_filename, FA_OPEN_ALWAYS | FA_WRITE);
-    if (FR_OK != fr && FR_EXIST != fr)
+    if (FR_OK != fr && FR_EXIST != fr) {
         panic("f_open(%s) error: %s (%d)\n", multicore_struct->mSD->fp_audio_filename, FRESULT_str(fr), fr);
+    }
 
     // Write the wav header/etc 
     write_standard_wav_header(multicore_struct);
@@ -301,6 +336,7 @@ static void init_env_file(recording_multicore_struct_single_t* multicore_struct)
         multicore_struct->EXT_RTC->fullstring
     );
 
+
     // Check if file exists 
     FRESULT FR;
     FILINFO FNO;
@@ -309,13 +345,13 @@ static void init_env_file(recording_multicore_struct_single_t* multicore_struct)
     bool exists = SD_IS_EXIST(multicore_struct->mSD->fp_env_filename);
     if (exists) { // delete 
         f_unlink(multicore_struct->mSD->fp_env_filename);
-        printf("The file %s exists- deleting.\r\n", multicore_struct->mSD->fp_env_filename);
     } 
     
     // Open the file with write access (FA_WRITE) with the read/write pointer at the start (FA_OPEN_ALWAYS)
     FRESULT fr = f_open(multicore_struct->mSD->fp_env, multicore_struct->mSD->fp_env_filename, FA_OPEN_ALWAYS | FA_WRITE);
-    if (FR_OK != fr && FR_EXIST != fr)
+    if (FR_OK != fr && FR_EXIST != fr) {
         panic("f_open(%s) error: %s (%d)\n", multicore_struct->mSD->fp_env_filename, FRESULT_str(fr), fr);
+    }
 
 }
 
@@ -360,8 +396,8 @@ static void core1_process(void) {
 
     recording_multicore_struct_single_t* multicore_struct = (recording_multicore_struct_single_t*)multicore_fifo_pop_blocking();
 
-    // set up the BME for SPI. Note that the VEML is just I2C and we already set that up earlier with the RTC I2C/etc. 
-    setup_bme(); 
+    // set up the BME for SPI. Note that the VEML is just I2C and we already set that up earlier with the RTC I2C/etc. Note that EXT_RTC mutex is needed.
+    setup_bme(multicore_struct->EXT_RTC->mutex); 
     uint32_t pacer;
 
     while (true) { 
@@ -385,17 +421,6 @@ static void free_audiostruct(recording_multicore_struct_single_t* multicore_stru
     // and the active...
     free(multicore_struct->active);
     
-    // the RTC
-    rtc_free(multicore_struct->EXT_RTC);
-
-    // unclaim the dma channel
-    dma_channel_unclaim(*multicore_struct->ADC_BUFA_CHAN);
-
-    // and free... 
-    free(multicore_struct->ADC_BUFA);
-    free(multicore_struct->ADC_BUFA_CHAN);
-    free(multicore_struct->ADC_BUFA_CONF);
-
     // if the BME exists
     if (USE_ENV) {
 
@@ -404,18 +429,51 @@ static void free_audiostruct(recording_multicore_struct_single_t* multicore_stru
         free(multicore_struct->ENV_SHOULD_CONTINUE);
         free(multicore_struct->ENV_SLEEPING);
         free(multicore_struct->ENV_STRINGBUFFER);
-        veml_free(multicore_struct->VEML);
+        veml_free(multicore_struct->VEML); // needs the RTC to still exist. 
 
     }
 
+    // the RTC (if flashlog is not used- else flashlog.h will deinit the flashlog RTC)
+    if (!USE_FLASHLOG) {
+        rtc_free(multicore_struct->EXT_RTC);
+    }
+
+    // unclaim the dma channel
+    dma_channel_unclaim(*multicore_struct->ADC_BUFA_CHAN);
+
+    // and free... 
+    free(multicore_struct->ADC_BUFA);
+    free(multicore_struct->ADC_BUFA_CHAN);
+    free(multicore_struct->ADC_BUFA_CONF);
+    free(multicore_struct->ADC_WHICH_HALF);
+
     // then free debug stuff
     free(multicore_struct->mSD->fp_debug);
-    free(multicore_struct->mSD->fp_audio_filename);
-    free(multicore_struct->mSD->bw_env);
+    free(multicore_struct->mSD->fp_debug_filename);
+    free(multicore_struct->mSD->bw_debug);
 
     // Free the struct overall, too.
     free(multicore_struct);
 
+}
+
+static void env_singlet(recording_multicore_struct_single_t* multicore_struct, datetime_t* dtime) {
+    *multicore_struct->ENV_SHOULD_CONTINUE=false; // stop data gathering. this is set back to true by core1 when we push again.
+    while (!*multicore_struct->ENV_SLEEPING) { // wait for core1 to stop any activity/go to sleep 
+        busy_wait_us(100);
+    }
+    sd_active_wait(multicore_struct); 
+    init_env_file(multicore_struct); // initiate the ENV file to dump our environmental stringbuf to 
+    int32_t strings_to_dump = *multicore_struct->mSD->bw_env/TIME_VEML_BME_STRINGSIZE;
+    for (int k = 0; k < strings_to_dump; k++) {
+        f_puts(multicore_struct->ENV_STRINGBUFFER + TIME_VEML_BME_STRINGSIZE*k, multicore_struct->mSD->fp_env);
+    }
+    FRESULT fr;
+    fr = f_close(multicore_struct->mSD->fp_env);
+    if (FR_OK != fr) {
+        panic("f_close error environmental: %s (%d)\n", FRESULT_str(fr), fr);
+    }
+    sd_active_done(multicore_struct);
 }
 
 // run this code to do a single recording (as part of a recording sequence) with a multicore_struct already initialized. returns a true on success.
@@ -431,76 +489,47 @@ static void recording_singlet(recording_multicore_struct_single_t* multicore_str
 
     sd_active_wait(multicore_struct);
     init_wav_file(multicore_struct);   // initiate the wave file for audio
+
     adc_fifo_drain();   // drain fifo
     adc_run(true);  // run ADC 
     dma_channel_set_write_addr(*multicore_struct->ADC_BUFA_CHAN, multicore_struct->ADC_BUFA, true);   // trigger DMA to the first half of the buffer immediately 
+    *multicore_struct->ADC_WHICH_HALF = 0; // we're currently writing the zeroth half 
     f_write_audiobuf( 
         multicore_struct->mSD->fp_audio,
         multicore_struct->ADC_BUFA,
         RECORDING_FILE_DATA_SIZE,
         multicore_struct->mSD->bw,
-        *multicore_struct->ADC_BUFA_CHAN
+        *multicore_struct->ADC_BUFA_CHAN,
+        multicore_struct->ADC_WHICH_HALF
     ); // and run the ADC file writing
     adc_run(false); // all done: stop the ADC
+
     FRESULT fr;
     fr = f_close(multicore_struct->mSD->fp_audio); // done. finish the audio file. 
     if (FR_OK != fr) {
-        printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
+        panic("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
     }
     sd_active_done(multicore_struct);
 
-    // now also write the environmental recording 
+    // write env buffer 
     if (USE_ENV) { 
-        *multicore_struct->ENV_SHOULD_CONTINUE=false; // stop data gathering. this is set back to true by core1 when we push again.
-        while (!*multicore_struct->ENV_SLEEPING) { // wait for core1 to stop any activity/go to sleep 
-            busy_wait_us(100);
+        try {
+            env_singlet(multicore_struct, dtime);
+        } catch (...) {
+            custom_printf("Env write failed, first pass.\r\n"); // no point in logging to file at this point, as it will probably fail.
+
+            try {
+                // re-try file write 
+                env_singlet(multicore_struct, dtime);
+            } catch (...) {
+
+                panic("We're done. Env fail second pass.\r\n");
+
+            }
+
         }
-        sd_active_wait(multicore_struct); 
-        init_env_file(multicore_struct); // initiate the ENV file to dump our environmental stringbuf to 
-        int32_t strings_to_dump = *multicore_struct->mSD->bw_env/TIME_VEML_BME_STRINGSIZE;
-        for (int k = 0; k < strings_to_dump; k++) {
-            f_puts(multicore_struct->ENV_STRINGBUFFER + TIME_VEML_BME_STRINGSIZE*k, multicore_struct->mSD->fp_env);
-        }
-        FRESULT fr;
-        fr = f_close(multicore_struct->mSD->fp_env);
-        if (FR_OK != fr) {
-            printf("f_close error environmental: %s (%d)\n", FRESULT_str(fr), fr);
-        }
-        sd_active_done(multicore_struct);
-    
+
     }
-
-}
-
-// create a log file to use for a given session (which will store anything we want to log. Just a standard .txt file.)
-static void init_debug_file(recording_multicore_struct_single_t* multicore_struct) {
-
-    // Read the current time + get string 
-    rtc_read_string_time(multicore_struct->EXT_RTC);
-
-    // Generate a string with the time at the front and .log on the end: fullstring is maximum of 22 bytes, .log is 4 bytes. 
-    snprintf(
-        multicore_struct->mSD->fp_debug_filename,
-        26,
-        "%s.log",
-        multicore_struct->EXT_RTC->fullstring
-    );
-
-    // Check if file exists 
-    FRESULT FR;
-    FILINFO FNO;
-
-    // Check if the file exists 
-    bool exists = SD_IS_EXIST(multicore_struct->mSD->fp_debug_filename);
-    if (exists) { // delete 
-        f_unlink(multicore_struct->mSD->fp_debug_filename);
-        printf("The file %s exists- deleting.\r\n", multicore_struct->mSD->fp_debug_filename);
-    } 
-    
-    // Open the file with write access (FA_WRITE) with the read/write pointer at the start (FA_OPEN_ALWAYS)
-    FRESULT fr = f_open(multicore_struct->mSD->fp_debug, multicore_struct->mSD->fp_debug_filename, FA_OPEN_ALWAYS | FA_WRITE);
-    if (FR_OK != fr && FR_EXIST != fr)
-        panic("f_open(%s) error: %s (%d)\n", multicore_struct->mSD->fp_debug_filename, FRESULT_str(fr), fr);
 
 }
 
@@ -509,12 +538,9 @@ void run_wav_bme_sequence_single(void) {
 
     recording_multicore_struct_single_t* test_struct = audiostruct_generate_single();   // generate the multicore_struct 
 
-    printf("Mounting SD card volume.");   // mount the SD volume
+    custom_printf("Mounting SD card volume.");   // mount the SD volume
     FRESULT fr = f_mount(&test_struct->mSD->pSD->fatfs, test_struct->mSD->pSD->pcName, 1); 
     if (FR_OK != fr) panic("f_mount error: %s (%d)\n", FRESULT_str(fr), fr); 
-
-    // initiate our debug file for this recording SESSION 
-    init_debug_file(test_struct);
 
     setup_adc(); // Set up the ADC 
 
@@ -526,7 +552,6 @@ void run_wav_bme_sequence_single(void) {
         multicore_fifo_push_blocking((uintptr_t)test_struct); // pass over our test_struct 
     }
 
-    char* debug_error_buffer = (char*)malloc(100); // buffer for debug 
     for (int j = 0; j < RECORDING_NUMBER_OF_FILES; j++) { // iterate over number of files 
     
         /**
@@ -536,25 +561,11 @@ void run_wav_bme_sequence_single(void) {
          * That should satisfy the error catchment needs (no two errors in a row, I'd hope.)
         */
 
-        printf("Doing file number %d\r\n", j);
+        custom_printf("Doing file number %d\r\n", j);
 
         try {
             recording_singlet(test_struct, dtime);
         } catch (...) {
-
-            // write to the log file that an error has occurred on this recording. 
-            snprintf(
-                debug_error_buffer,
-                100,
-                "Recording 1st Fail ... %s ... retrying.\n", 
-                test_struct->EXT_RTC->fullstring
-            );
-            f_write(
-                test_struct->mSD->fp_debug,
-                debug_error_buffer,
-                100,
-                test_struct->mSD->bw_debug
-            );
 
             try {
                 // re-run recording 
@@ -566,22 +577,7 @@ void run_wav_bme_sequence_single(void) {
                 recording_singlet(test_struct, dtime);
             } catch (...) {
 
-                // write to the log file that an error has occurred on this recording + abandon it (reset the mSD mount after.)
-                snprintf(
-                    debug_error_buffer,
-                    100,
-                    "Recording 2nd Fail ... %s ... panic.\n", 
-                    test_struct->EXT_RTC->fullstring
-                );
-                f_write(
-                    test_struct->mSD->fp_debug,
-                    debug_error_buffer,
-                    100,
-                    test_struct->mSD->bw_debug
-                );
-
-                // also throw a fat panic and stop everything. 
-                panic("We're done.\r\n");
+                panic("RECORDING SINGLET FAILED SECOND PASS! Oof %d, j");
 
             }
 
@@ -589,27 +585,17 @@ void run_wav_bme_sequence_single(void) {
     }
 
     if (USE_ENV) {
-        busy_wait_ms(1100*ENV_RECORD_PERIOD_SECONDS);
+        sleep_ms(1100*ENV_RECORD_PERIOD_SECONDS);
         multicore_reset_core1();
     }
 
-    // finally close our debug file 
-    fr = f_close(test_struct->mSD->fp_debug); // done. finish the debug file. 
-    if (FR_OK != fr) {
-        printf("f_close debug file error: %s (%d)\n", FRESULT_str(fr), fr);
-    }
-
     f_unmount(test_struct->mSD->pSD->pcName);
-    printf("Unmounted & Cycles all done baby! Successful recording session.\r\n");
+    custom_printf("Unmounted SD card- session done :)\r\n");
 
     // free the test struct
     free_audiostruct(test_struct);
 
     // and the time
     free(dtime);
-
-    // finally the debug buffer
-    free(debug_error_buffer);
-
 
 }

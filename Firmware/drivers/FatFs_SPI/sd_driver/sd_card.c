@@ -159,6 +159,7 @@ specific language governing permissions and limitations under the License.
  * +------+---------+---------+- -  - -+---------+-----------+----------+
  */
 
+
 /* Standard includes. */
 #include <inttypes.h>
 #include <string.h>
@@ -174,6 +175,10 @@ specific language governing permissions and limitations under the License.
 #include "ff.h" /* Obtains integer types */
 //
 #include "diskio.h" /* Declarations of disk functions */  // Needed for STA_NOINIT, ...
+//
+#include <math.h>
+//
+#include "hardware/adc.h"
 
 #ifndef SD_CRC_ENABLED
 #define SD_CRC_ENABLED 1
@@ -200,7 +205,7 @@ static bool crc_on = true;
 */
 
 /* Control Tokens   */
-#define SPI_DATA_RESPONSE_MASK (0x1F)
+#define SPI_DATA_RESPONSE_MASK (0x1F) // 0b00011111
 #define SPI_DATA_ACCEPTED (0x05)
 #define SPI_DATA_CRC_ERROR (0x0B)
 #define SPI_DATA_WRITE_ERROR (0x0D)
@@ -896,6 +901,8 @@ int sd_read_blocks(sd_card_t *pSD, uint8_t *buffer, uint64_t ulSectorNumber,
     return status;
 }
 
+
+
 static uint8_t sd_write_block(sd_card_t *pSD, const uint8_t *buffer,
                               uint8_t token, uint32_t length) {
 
@@ -910,13 +917,8 @@ static uint8_t sd_write_block(sd_card_t *pSD, const uint8_t *buffer,
     bool ret = sd_spi_transfer(pSD, buffer, NULL, length);
     myASSERT(ret);
 
-
-#if SD_CRC_ENABLED
-    if (crc_on) {
-        // Compute CRC
-        crc = crc16((void *)buffer, length);
-    }
-#endif
+    // calculate crc 
+    crc = crc16(buffer, length);
 
     // write the checksum CRC16
     sd_spi_write(pSD, crc >> 8);
@@ -932,7 +934,140 @@ static uint8_t sd_write_block(sd_card_t *pSD, const uint8_t *buffer,
     return (response & SPI_DATA_RESPONSE_MASK);
 }
 
-/** In the case of single-block writes, the block is written and afterward the ADC is automatically triggered to fill it up again
+static uint8_t sd_write_audioblock(sd_card_t *pSD, const uint8_t *buffer,
+                              uint8_t token, uint32_t length) {
+
+
+    uint16_t crc = (~0);
+    uint8_t response = 0xFF;
+
+    // indicate start of block
+    sd_spi_write(pSD, token);
+
+    // write the data
+    bool ret = crc_spi_transfer(pSD->spi, buffer, NULL, &crc, length);
+    myASSERT(ret);
+
+    // write the checksum CRC16
+    sd_spi_write(pSD, crc >> 8);
+    sd_spi_write(pSD, crc);
+
+    // check the response token
+    response = sd_spi_write(pSD, SPI_FILL_CHAR);
+
+    // Wait for last block to be written
+    if (false == sd_wait_ready(pSD, SD_COMMAND_TIMEOUT)) {
+        DBG_PRINTF("%s:%d: Card not ready yet\r\n", __FILE__, __LINE__);
+    }
+    return (response & SPI_DATA_RESPONSE_MASK);
+}
+
+static uint8_t sd_write_audioblock_dma(sd_card_t *pSD, uint8_t token) {
+
+    uint16_t crc = (~0);
+    uint8_t response = 0xFF;
+
+    // indicate start of block
+    sd_spi_write(pSD, token);
+
+    // write the data
+    bool ret = adc_crc_spi_transfer(pSD->spi, &crc);
+    myASSERT(ret);
+
+    // write the checksum CRC16
+    sd_spi_write(pSD, crc >> 8);
+    sd_spi_write(pSD, crc);
+
+    // check the response token
+    response = sd_spi_write(pSD, SPI_FILL_CHAR);
+
+    // Wait for last block to be written
+    if (false == sd_wait_ready(pSD, SD_COMMAND_TIMEOUT)) {
+        DBG_PRINTF("%s:%d: Card not ready yet\r\n", __FILE__, __LINE__);
+    }
+    return (response & SPI_DATA_RESPONSE_MASK);
+}
+
+/* See in_sd_write_audioblocks for more detail. This rips straight from ADC DMA.*/
+static int in_sd_write_audioblocks_dma(
+    sd_card_t *pSD,
+    uint64_t ulSectorNumber, 
+    uint32_t blockCnt
+    ) {
+    if (ulSectorNumber + blockCnt > pSD->sectors)
+        return SD_BLOCK_DEVICE_ERROR_PARAMETER;
+    if (pSD->m_Status & (STA_NOINIT | STA_NODISK))
+        return SD_BLOCK_DEVICE_ERROR_PARAMETER;
+
+    int status = SD_BLOCK_DEVICE_ERROR_NONE;
+    uint8_t response;
+    uint64_t addr;
+
+    // SDSC Card (CCS=0) uses byte unit address
+    // SDHC and SDXC Cards (CCS=1) use block unit address (512 Bytes unit)
+    if (SDCARD_V2HC == pSD->card_type) {
+        addr = ulSectorNumber;
+    } else {
+        addr = ulSectorNumber * _block_size;
+    }
+    // Send command to perform write operation using the "normal" method
+    if (blockCnt == 1) {
+        // Single block write command
+        if (SD_BLOCK_DEVICE_ERROR_NONE !=
+            (status = sd_cmd(pSD, CMD24_WRITE_BLOCK, addr, false, 0))) {
+            return status;
+        }
+
+        // flush the ADC + write data 
+        response = sd_write_audioblock_dma(pSD, SPI_START_BLOCK); 
+
+        // Only CRC and general write error are communicated via response token
+        if (response != SPI_DATA_ACCEPTED) {
+            DBG_PRINTF("Single Block Write failed: 0x%x \r\n", response);
+            status = SD_BLOCK_DEVICE_ERROR_WRITE;
+        }
+    } else {
+
+        // Pre-erase setting prior to multiple block write operation
+        sd_cmd(pSD, ACMD23_SET_WR_BLK_ERASE_COUNT, blockCnt, 1, 0);
+
+        // Some SD cards want to be deselected between every bus transaction:
+        sd_spi_deselect_pulse(pSD);
+
+        // Multiple block write command
+        if (SD_BLOCK_DEVICE_ERROR_NONE !=
+            (status = sd_cmd(pSD, CMD25_WRITE_MULTIPLE_BLOCK, addr, false, 0))) {
+            return status;
+        }
+
+        while (blockCnt>0) { // write two blocks at a time. if unity pops up in blockCnt remaining, then the second block is not done. 
+
+            // flush the ADC + write data 
+            response = sd_write_audioblock_dma(pSD, SPI_START_BLOCK); 
+            if (response != SPI_DATA_ACCEPTED) {
+                DBG_PRINTF("Multiple Block Audio Write failed, First Stage: 0x%x\r\n", response);
+                status = SD_BLOCK_DEVICE_ERROR_WRITE;
+                break;
+            }
+
+            blockCnt -= 1;
+
+        }
+
+        sd_spi_write(pSD, SPI_STOP_TRAN);
+    }
+    uint32_t stat = 0;
+
+    // Some SD cards want to be deselected between every bus transaction:
+    sd_spi_deselect_pulse(pSD);
+    status = sd_cmd(pSD, CMD13_SEND_STATUS, 0, false, &stat);
+    return status;
+}
+
+/* NOTE THAT WE HAVE DISABLED STEPPING OF BUFF HERE- THE BUFF IS ALWAYS THE SAME AS ADC_BUF_A / THE START POINT OF OUR 1024 BYTES! :D :D :D */
+/* NOTE THAT WE HAVE DISABLED STEPPING OF BUFF HERE- THE BUFF IS ALWAYS THE SAME AS ADC_BUF_A / THE START POINT OF OUR 1024 BYTES! :D :D :D */
+/* NOTE THAT WE HAVE DISABLED STEPPING OF BUFF HERE- THE BUFF IS ALWAYS THE SAME AS ADC_BUF_A / THE START POINT OF OUR 1024 BYTES! :D :D :D */
+/** In the case of single-block writes, the block is written + the next block in our ADC_BUFA is triggered to be filled (we know via ADC_WHICH_HALF)
  * In the case of multi-block writes, the first half of the block (512 bytes) is written, and while being written, the second half is filled 
  * After this, the second half is written, while the first is filled
  * This ping-pong continues until blockCnt has been satisfied (the pingponging ensures that enough time is given for each block to write.)
@@ -947,10 +1082,11 @@ static uint8_t sd_write_block(sd_card_t *pSD, const uint8_t *buffer,
  * NOTE NOTE NOTE NOTE NOTE NOTE NOTE
  * DMA TRANSFERS IN HERE ARE NON BLOCKING! We assume that if we have to block, then the speed isn't tolerable + errors up.
  * 
- *  @param buffer       Buffer of data to write to blocks: this is wbuff from ff.c, and is 8-bit data. See 
+ *  @param buffer       ADC_BUFA pointer. This does not mutate or change. It is always the zeroth of our 1,024 byte buffer.
  *  @param ulSectorNumber     Logical Address of block to begin writing to (LBA)
  *  @param blockCnt     Size to write in blocks
  *  @param DMA_CHAN_BUF Configured to fill buffer1 from ADC in batches of 512 bytes/256 samples with all the other correct bits.
+ *  @param ADC_WHICH_HALF The current half being DMA-written from the ADC, 0-based.
  *  @return         SD_BLOCK_DEVICE_ERROR_NONE(0) - success
  *                  SD_BLOCK_DEVICE_ERROR_NO_DEVICE - device (SD card) is
  * missing or not connected SD_BLOCK_DEVICE_ERROR_CRC - crc error
@@ -961,7 +1097,7 @@ static uint8_t sd_write_block(sd_card_t *pSD, const uint8_t *buffer,
  *                  SD_BLOCK_DEVICE_ERROR_ERASE - erase error
  */
 static int in_sd_write_audioblocks(sd_card_t *pSD, const uint8_t *buffer,
-                              uint64_t ulSectorNumber, uint32_t blockCnt, int32_t DMA_CHAN_BUF) {
+                              uint64_t ulSectorNumber, uint32_t blockCnt, int8_t ADC_BUFA_CHAN, int8_t* ADC_WHICH_HALF) {
     if (ulSectorNumber + blockCnt > pSD->sectors)
         return SD_BLOCK_DEVICE_ERROR_PARAMETER;
     if (pSD->m_Status & (STA_NOINIT | STA_NODISK))
@@ -986,14 +1122,12 @@ static int in_sd_write_audioblocks(sd_card_t *pSD, const uint8_t *buffer,
             return status;
         }
 
-        // wait for the dma to finish 
-        dma_channel_wait_for_finish_blocking(DMA_CHAN_BUF);
-        
-        // Write data
-        response = sd_write_block(pSD, buffer, SPI_START_BLOCK, _block_size);
+        dma_channel_wait_for_finish_blocking(ADC_BUFA_CHAN); // wait for the current ADC transaction to finish 
+        *ADC_WHICH_HALF = !*ADC_WHICH_HALF; // switch the current ADC->BUF half to the next half 
+        dma_channel_set_write_addr(ADC_BUFA_CHAN, (uint8_t*)buffer + 512*(*ADC_WHICH_HALF), true); // trigger DMA to next half 
 
-        // trigger DMA to the first half of the buffer immediately 
-        dma_channel_set_write_addr(DMA_CHAN_BUF, (uint8_t*)buffer, true);
+        // Write data
+        response = sd_write_audioblock(pSD, (uint8_t*)(buffer + 512*(!(*ADC_WHICH_HALF))), SPI_START_BLOCK, _block_size); // write the previous half (freshly populated)
 
         // Only CRC and general write error are communicated via response token
         if (response != SPI_DATA_ACCEPTED) {
@@ -1016,14 +1150,12 @@ static int in_sd_write_audioblocks(sd_card_t *pSD, const uint8_t *buffer,
 
         while (blockCnt>0) { // write two blocks at a time. if unity pops up in blockCnt remaining, then the second block is not done. 
 
-            // wait for the dma to finish 
-            dma_channel_wait_for_finish_blocking(DMA_CHAN_BUF);
-
-            // trigger DMA to the second half of the buffer immediately 
-            dma_channel_set_write_addr(DMA_CHAN_BUF, (uint8_t*)(buffer + 512), true);
+            dma_channel_wait_for_finish_blocking(ADC_BUFA_CHAN); // wait for the current ADC transaction to finish 
+            *ADC_WHICH_HALF = !*ADC_WHICH_HALF; // switch the current ADC->BUF half to the next half 
+            dma_channel_set_write_addr(ADC_BUFA_CHAN, (uint8_t*)buffer + 512*(*ADC_WHICH_HALF), true); // trigger DMA to next half 
 
             // do the first buffer half
-            response = sd_write_block(pSD, (uint8_t*)buffer, SPI_START_BLK_MUL_WRITE, _block_size);
+            response = sd_write_audioblock(pSD, (uint8_t*)(buffer + 512*(!(*ADC_WHICH_HALF))), SPI_START_BLK_MUL_WRITE, _block_size);
             if (response != SPI_DATA_ACCEPTED) {
                 DBG_PRINTF("Multiple Block Audio Write failed, First Stage: 0x%x\r\n", response);
                 status = SD_BLOCK_DEVICE_ERROR_WRITE;
@@ -1034,14 +1166,12 @@ static int in_sd_write_audioblocks(sd_card_t *pSD, const uint8_t *buffer,
 
             if (blockCnt>0) { 
 
-                // wait for the dma to finish 
-                dma_channel_wait_for_finish_blocking(DMA_CHAN_BUF);
-
-                // trigger DMA to the first half of the buffer immediately 
-                dma_channel_set_write_addr(DMA_CHAN_BUF, (uint8_t*)buffer, true);
+                dma_channel_wait_for_finish_blocking(ADC_BUFA_CHAN); // wait for the current ADC transaction to finish 
+                *ADC_WHICH_HALF = !*ADC_WHICH_HALF; // switch the current ADC->BUF half to the next half 
+                dma_channel_set_write_addr(ADC_BUFA_CHAN, (uint8_t*)buffer + 512*(*ADC_WHICH_HALF), true); // trigger DMA to next half 
 
                 // do the second buffer half
-                response = sd_write_block(pSD, (uint8_t*)(buffer + 512), SPI_START_BLK_MUL_WRITE, _block_size);
+                response = sd_write_audioblock(pSD, (uint8_t*)(buffer + 512*(!(*ADC_WHICH_HALF))), SPI_START_BLK_MUL_WRITE, _block_size);
 
                 if (response != SPI_DATA_ACCEPTED) {
                     DBG_PRINTF("Multiple Block Audio Write failed, Second Stage: 0x%x\r\n", response);
@@ -1053,8 +1183,7 @@ static int in_sd_write_audioblocks(sd_card_t *pSD, const uint8_t *buffer,
 
             } else {
 
-                // trigger DMA to the first half of the buffer immediately 
-                dma_channel_set_write_addr(DMA_CHAN_BUF, (uint8_t*)buffer, true);
+                ; // nothing to do- ran out of blocks, and the previous DMA will finish up the ADC happily.
 
             }
 
@@ -1185,11 +1314,12 @@ int sd_write_blocks(sd_card_t *pSD, const uint8_t *buffer,
 
 int sd_write_audioblocks(sd_card_t *pSD, const uint8_t *buffer,
                     uint64_t ulSectorNumber, uint32_t blockCnt,
-                    int32_t DMA_CHAN_BUF) {
+                    int8_t ADC_BUFA_CHAN, int8_t* ADC_WHICH_HALF) {
     sd_acquire(pSD);
     TRACE_PRINTF("sd_write_blocks(0x%p, 0x%llx, 0x%lx)\r\n", buffer,
                  ulSectorNumber, blockCnt);
-    int status = in_sd_write_audioblocks(pSD, buffer, ulSectorNumber, blockCnt, DMA_CHAN_BUF);
+    int status = in_sd_write_audioblocks(pSD, buffer, ulSectorNumber, blockCnt, ADC_BUFA_CHAN, ADC_WHICH_HALF);
+    //int status = in_sd_write_audioblocks_dma(pSD, ulSectorNumber, blockCnt);
     sd_release(pSD);
     return status;
 }

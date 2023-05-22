@@ -1,9 +1,4 @@
 #include "mSD.h"
-#include <stdio.h>
-#include <stdbool.h>
-#include <string.h>
-#include <time.h>
-#include <malloc.h>
 
 // Stolen from no-OS-FatFS- check if the test_filename exists. 
 bool SD_IS_EXIST(const char *test_filename) {

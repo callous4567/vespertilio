@@ -88,7 +88,7 @@ int sd_write_blocks(sd_card_t *pSD, const uint8_t *buffer,
 // make sure to configure up the DMA channel to write 512 bytes worth of data to the correct start address (the start of buf)
 int sd_write_audioblocks(sd_card_t *pSD, const uint8_t *buffer,
                     uint64_t ulSectorNumber, uint32_t blockCnt,
-                    int32_t DMA_CHAN_BUF);
+                    int8_t ADC_BUFA_CHAN, int8_t* ADC_WHICH_HALF);
 
 int sd_read_blocks(sd_card_t *pSD, uint8_t *buffer, uint64_t ulSectorNumber,
                    uint32_t ulSectorCount);

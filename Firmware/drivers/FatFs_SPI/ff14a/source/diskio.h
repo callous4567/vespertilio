@@ -34,7 +34,8 @@ DRESULT disk_write_audiobuf(BYTE pdrv, /* Physical drive nmuber to identify the 
                    const BYTE *buff, /* Data to be written */
                    LBA_t sector,     /* Start sector in LBA */
                    UINT count,        /* Number of sectors to write */
-                   int32_t DMA_CHAN_BUF /* DMA channel for the buffer */
+                   int8_t ADC_BUFA_CHAN, // DMA 
+				   int8_t* ADC_WHICH_HALF // Which half of buf is written currently 
 );
 DRESULT disk_ioctl (BYTE pdrv, BYTE cmd, void* buff);
 

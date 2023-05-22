@@ -119,12 +119,13 @@ DRESULT disk_write_audiobuf(BYTE pdrv, /* Physical drive nmuber to identify the 
                    const BYTE *buff, /* Data to be written */
                    LBA_t sector,     /* Start sector in LBA */
                    UINT count,        /* Number of sectors to write */
-                   int32_t DMA_CHAN_BUF /* DMA channel for the buffer */
+                   int8_t ADC_BUFA_CHAN, // DMA chan for buffer 
+                   int8_t* ADC_WHICH_HALF  // which half of it is currently being written (0,1) 
 ) {
     TRACE_PRINTF(">>> %s\n", __FUNCTION__);
     sd_card_t *p_sd = sd_get_by_num(pdrv);
     if (!p_sd) return RES_PARERR;
-    int rc = sd_write_audioblocks(p_sd, buff, sector, count, DMA_CHAN_BUF);
+    int rc = sd_write_audioblocks(p_sd, buff, sector, count, ADC_BUFA_CHAN, ADC_WHICH_HALF);
     return sdrc2dresult(rc);
 }
 

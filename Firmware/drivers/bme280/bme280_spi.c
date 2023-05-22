@@ -7,8 +7,6 @@
 
 
 #include "bme280_spi.h"
-#include "malloc.h"
-#include <stdio.h>
 #include "pico/stdlib.h"
 #include "pico/binary_info.h"
 #include "../Utilities/pinout.h"
@@ -37,6 +35,10 @@
 
 // define baudrate and spi 
 static const int32_t BME_BAUD = 10*1000*1000;
+
+// mutex
+mutex_t* BME_MUTEX;
+static const int32_t BME_MUTEX_TIMEOUT_MS = 1000;
 
 int32_t t_fine;
 
@@ -122,33 +124,37 @@ static void write_register(uint8_t reg, uint8_t data) {
     buf[0] = reg & 0x7f;  // remove read bit as this is a write
     buf[1] = data;
     cs_select();
-    busy_wait_ms(5);
+    sleep_ms(5);
+    mutex_enter_timeout_ms(BME_MUTEX, BME_MUTEX_TIMEOUT_MS);
     spi_write_blocking(spi0, buf, 2);
+    mutex_exit(BME_MUTEX);
     cs_deselect();
-    busy_wait_ms(5);
+    sleep_ms(5);
 
 }
 
 // read the register reg to the buffer (length len uint8_t bytes.) Note that there is a cost of 3-ish milliseconds here.
 static void read_registers(uint8_t reg, uint8_t *buf, uint16_t len) {
+
     // For this particular device, we send the device the register we want to read
     // first, then subsequently read from the device. The register is auto incrementing
     // so we don't need to keep sending the register we want, just the first.
     reg |= READ_BIT;
     cs_select();
-    busy_wait_ms(1);
+    sleep_ms(1);
+    mutex_enter_timeout_ms(BME_MUTEX, BME_MUTEX_TIMEOUT_MS);
     spi_write_blocking(spi0, &reg, 1);
-    busy_wait_ms(1);
+    sleep_ms(1);
     spi_read_blocking(spi0, 0, buf, len);
+    mutex_exit(BME_MUTEX);
     cs_deselect();
-    busy_wait_ms(1);
+    sleep_ms(1);
 
 }
 
 /* This function reads the manufacturing assigned compensation parameters from the device */
 static void read_compensation_parameters() {
     uint8_t buffer[26];
-
     read_registers(0x88, buffer, 24);
 
     dig_T1 = buffer[0] | (buffer[1] << 8);
@@ -168,7 +174,6 @@ static void read_compensation_parameters() {
     dig_H1 = buffer[25];
 
     read_registers(0xE1, buffer, 8);
-
     dig_H2 = buffer[0] | (buffer[1] << 8);
     dig_H3 = (int8_t) buffer[2];
     dig_H4 = buffer[3] << 4 | (buffer[4] & 0xf);
@@ -243,11 +248,13 @@ static inline void init_default_spi_bme(void) {
     gpio_set_drive_strength(BME_SCK_PIN, GPIO_DRIVE_STRENGTH_4MA);
     gpio_set_drive_strength(BME_MOSI_PIN, GPIO_DRIVE_STRENGTH_4MA);
 
-
 }
 
 // set up the BME
-void setup_bme(void) {
+void setup_bme(mutex_t* EXT_RTC_MUTEX) {
+
+    // set the mutex
+    BME_MUTEX = EXT_RTC_MUTEX;
 
     // init SPI 
     init_default_spi_bme();
@@ -289,27 +296,4 @@ void bme_datastring(char* datastring) {
         temperature/100.0
     );
 
-}
-
-void test_bme(void) {
-
-    // setup 
-    setup_bme();
-
-    // allocate datastring 
-    char* datastring = (char*)malloc(20);
-
-    // allocate test values. 
-    int32_t humidity, pressure, temperature;
-
-    while (1) {
-
-        // These are the raw numbers from the chip, so we need to run through the
-        // compensations to get human understandable numbers
-        bme_datastring(datastring);
-
-        printf("The datastring is...!%s\r\n", datastring);
-
-        busy_wait_ms(1000);
-    }
 }

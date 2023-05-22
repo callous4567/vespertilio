@@ -4119,13 +4119,14 @@ FRESULT f_write (
 
 }
 
-
+/* Write the amount of bytes of audio. The number of bytes corresponds to the recording time (paced by the ADC DMA IRQ requests) and is calculated from sampling rate * recording time * 16-bits-per-sample. */
 FRESULT f_write_audiobuf (
 	FIL* fp,			/* Pointer to the file object */
 	const void* buff,	/* Pointer to the data to be written */
 	UINT btw,			/* Number of bytes to write */
 	UINT* bw,			/* Pointer to number of bytes written */
-	int32_t DMA_CHAN_BUF
+	int8_t ADC_BUFA_CHAN, // Which DMA chan
+	int8_t* ADC_WHICH_HALF // Which half is currently being written 
 )
 {
 	FRESULT res;
@@ -4176,7 +4177,7 @@ FRESULT f_write_audiobuf (
 						if (fs->winsect == fp->sect && sync_window(fs) != FR_OK) ABORT(fs, FR_DISK_ERR);	/* Write-back sector cache */
 			#else // hence this applies
 						if (fp->flag & FA_DIRTY) {		/* Write-back sector cache */
-							if (disk_write_audiobuf(fs->pdrv, fp->buf, fp->sect, 1, DMA_CHAN_BUF) != RES_OK) ABORT(fs, FR_DISK_ERR);
+							if (disk_write_audiobuf(fs->pdrv, fp->buf, fp->sect, 1,  ADC_BUFA_CHAN,  ADC_WHICH_HALF) != RES_OK) ABORT(fs, FR_DISK_ERR);
 							fp->flag &= (BYTE)~FA_DIRTY;
 						}
 			#endif
@@ -4188,7 +4189,7 @@ FRESULT f_write_audiobuf (
 							if (csect + cc > fs->csize) {	/* Clip at cluster boundary */
 								cc = fs->csize - csect;
 							}
-							if (disk_write_audiobuf(fs->pdrv, wbuff, sect, cc, DMA_CHAN_BUF) != RES_OK) ABORT(fs, FR_DISK_ERR);
+							if (disk_write_audiobuf(fs->pdrv, wbuff, sect, cc,  ADC_BUFA_CHAN,  ADC_WHICH_HALF) != RES_OK) ABORT(fs, FR_DISK_ERR);
 			#if FF_FS_MINIMIZE <= 2 // this is true: FF_FS_MINIMIZE=0 
 			#if FF_FS_TINY // this is false. 
 							if (fs->winsect - sect < cc) {	/* Refill sector cache if it gets invalidated by the direct write */

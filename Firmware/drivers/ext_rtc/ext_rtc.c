@@ -9,32 +9,36 @@
 #include "hardware/structs/scb.h"
 #include "hardware/clocks.h"
 #include "hardware/irq.h"
+//#include "pico/stdio_uart.h"
+//#include "pico/stdio_usb.h"
 
-static void enable_external_pulls(void) {
+static const int32_t RTC_MUTEX_TIMEOUT_MS = 1000; // mutex timeout in ms 
 
+static void disable_rtc_pulls(void) {
     // set the pulls on the internals to off, too
     gpio_set_pulls(RTC_SDA_PIN, false, false);
     gpio_set_pulls(RTC_SCK_PIN, false, false);
     gpio_set_pulls(RTC_INT_PIN, false, false);
+}
+static void enable_external_pulls(void) {
+
+    disable_rtc_pulls();
 
     // configure the external pullup setup 
     gpio_set_pulls(PULLUP_PIN, false, false);
     gpio_init(PULLUP_PIN);
     gpio_set_dir(PULLUP_PIN, GPIO_OUT);
     gpio_put(PULLUP_PIN, 1);
-    gpio_set_drive_strength(PULLUP_PIN, GPIO_DRIVE_STRENGTH_8MA);
-    busy_wait_ms(100); // for capacitor inrush 
+    gpio_set_drive_strength(PULLUP_PIN, GPIO_DRIVE_STRENGTH_4MA);
+    sleep_ms(100); // for capacitor inrush 
     
 
 }
 static void disable_external_pulls(void) {
 
-    // pull all the pins down by default
-    gpio_set_pulls(RTC_SDA_PIN, false, true);
-    gpio_set_pulls(RTC_SCK_PIN, false, true);
-    gpio_set_pulls(RTC_INT_PIN, false, true);
+    disable_rtc_pulls();
 
-    // disable the external pullup setup 
+    // disable the external pullup setup + pull down by default 
     gpio_put(PULLUP_PIN, 0);
     gpio_deinit(PULLUP_PIN);
     gpio_set_pulls(PULLUP_PIN, false, true);
@@ -48,6 +52,9 @@ void rtc_free(ext_rtc_t* EXT_RTC) {
     free(EXT_RTC->timebuf);
     free(EXT_RTC->alarmbuf);
     free(EXT_RTC->fullstring);
+    if (!USE_FLASHLOG) {
+        free(EXT_RTC->mutex);
+    }
     free(EXT_RTC);
     disable_external_pulls(); // disable the pullup setup 
 
@@ -194,6 +201,7 @@ static void rtc_register_read(
     address_ptr = &address;
 
     int number_written;
+    mutex_enter_timeout_ms(EXT_RTC->mutex, RTC_MUTEX_TIMEOUT_MS);
     number_written = i2c_write_blocking(
         EXT_RTC->hw_inst, 
         RTC_SLAVE_ADDRESS, 
@@ -210,6 +218,7 @@ static void rtc_register_read(
         len,
         false
     );
+    mutex_exit(EXT_RTC->mutex);
 
 }
 
@@ -232,6 +241,8 @@ static void rtc_register_write(
     }
     uint8_t *data_buff_ptr = &data_buff[0];
 
+    mutex_enter_timeout_ms(EXT_RTC->mutex, RTC_MUTEX_TIMEOUT_MS);
+
     i2c_write_blocking(
         EXT_RTC->hw_inst,
         RTC_SLAVE_ADDRESS,
@@ -240,9 +251,12 @@ static void rtc_register_write(
         false
     );
 
+    mutex_exit(EXT_RTC->mutex);
+
+
 }
 
-// Initialize the RTC object default. Returns it. MALLOC!!!!
+// Initialize the RTC object default. Returns it. MALLOC!!!! 
 ext_rtc_t* init_RTC_default(void) {
 
     // set all internal pulls to off since we are using external pullups 
@@ -256,6 +270,14 @@ ext_rtc_t* init_RTC_default(void) {
     EXT_RTC->ext_int = RTC_INT_PIN;
     EXT_RTC->hw_inst = RTC_I2C;
     EXT_RTC->baudrate = RTC_BAUD;
+
+    // Set the mutex for the RTC. If flashlog is used, inherit that. If not, make its own mutex.
+    if (USE_FLASHLOG) {
+        EXT_RTC->mutex = flashlog->mutex; 
+    } else {
+        EXT_RTC->mutex = (mutex_t*)malloc(sizeof(mutex_t));
+        mutex_init(EXT_RTC->mutex);
+    }
 
     // i2c setup
     i2c_init(
@@ -538,6 +560,7 @@ static void rtc_read_time(
 
 // read the current time from RTC, in integer format, to the timestring/fullstring. You do not need to call rtc_read_time before this.
 void rtc_read_string_time(ext_rtc_t *EXT_RTC) {
+
     /*
     the maximum number of chars/bytes written is...
     2 for second 
@@ -591,7 +614,8 @@ static void recover_from_sleep(uint scb_orig, uint clock0_orig, uint clock1_orig
 
     //reset clocks
     clocks_init();
-    //stdio_uart_init();
+    //stdio_uart_init(); // if using usb do not use this (+ disable the include for pico/stdio_uart)
+    // stdio_usb_init();
 
     return;
 }
@@ -634,12 +658,11 @@ void rtc_default_status(ext_rtc_t* EXT_RTC) {
 
 }
 
-// just generates a conveniently programmed RTC for debugging purposes (malloc'd obviously/etc.) Alarm 15 seconds after init.
+// generate up the debug RTC configured in line with write_default_test_configuration() in vespertilio_usb_int.c 
 ext_rtc_t* rtc_debug(void) {
     
     ext_rtc_t *EXT_RTC = init_RTC_default();
 
-    
     *EXT_RTC->alarmbuf = 15;
     *(EXT_RTC->alarmbuf+1) = 0;
     *(EXT_RTC->alarmbuf+2) = 1;
@@ -727,6 +750,9 @@ void rtc_setsleep_WHICH_ALARM_ONEBASED(int32_t* configuration_buffer, int32_t CO
 
     // init a default RTC object 
     ext_rtc_t* EXT_RTC = init_RTC_default();
+    rtc_read_string_time(EXT_RTC);
+    printf("Preparing to sleep... the current time is %s\r\n", EXT_RTC->fullstring);
+
 
     *EXT_RTC->alarmbuf = 0; // always set second to zero so who cares 
     *(EXT_RTC->alarmbuf+1) = *(configuration_buffer + CONFIGURATION_BUFFER_INDEPENDENT_VALUES + 7 + (3*WHICH_ALARM_ONEBASED) - 1); // the minute
@@ -738,9 +764,13 @@ void rtc_setsleep_WHICH_ALARM_ONEBASED(int32_t* configuration_buffer, int32_t CO
     rtc_default_status(EXT_RTC);
 
     // sleep + then wake up
+    printf("Sleeping...\r\n");
+    sleep_ms(100);
     rtc_sleep_until_alarm(EXT_RTC);
 
     // we're awake! free the RTC and continue.
+    rtc_read_string_time(EXT_RTC);
+    printf("Boom baby! We're awake! the current time is %s\r\n", EXT_RTC->fullstring);
     rtc_free(EXT_RTC);
 
 }
@@ -754,6 +784,7 @@ void alarmtest(void) {
     printf("Woke up.\r\n");
 
 }
+
 
 
 /* FOR THE ALARMS NOTE SOME THINGS

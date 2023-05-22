@@ -1,6 +1,8 @@
 #include "utils.h"
 #include "hardware/pwm.h"
 #include "pinout.h"
+#include "hardware/gpio.h"
+#include "hardware/timer.h"
 
 /**
  * We will slowly ramp up to 3V3 using PWM duty cycle @ the full 125 MHz (this will introduce ripple into 3V3 of the MAX8510, but it should be fine)
@@ -15,7 +17,7 @@ void digi_enable(void) {
     gpio_init(DIGI_ENABLE);
     gpio_set_dir(DIGI_ENABLE, GPIO_OUT);
     gpio_put(DIGI_ENABLE, 1);
-    busy_wait_ms(100); // for capacitor inrush 
+    sleep_ms(100); // for capacitor inrush 
     
 }
 void digi_disable(void) {
@@ -71,9 +73,9 @@ void debug_flash_LED(int32_t x, int32_t period) {
     for (int i = 0; i < x; i++) {
 
         gpio_put(25, 1);
-        busy_wait_ms(period);
+        sleep_ms(period);
         gpio_put(25, 0);
-        busy_wait_ms(period);
+        sleep_ms(period);
 
     }
     

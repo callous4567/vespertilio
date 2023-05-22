@@ -5,6 +5,8 @@ A battery-powered (for now!) bioacoustic recorder with a built-in ambient light 
 
 This is my first time with C (embedded or otherwise) and with a bunch of other things- PCBs, electronics, 3D CAD/printing/etc, so you will have to bare with me whilst I work through this project bit by bit 😅
 
+Note that at the moment, Rev. 6 of the project is fully-functional. Rev. 9 is the current WIP (codeskip 7,8) and incorporates a huge boatload of changes to hardware and software- this is t.b.d.
+
 ## Features 
 - BME280 for Environmental Sensing (Temp, Pressure, Humidity) as an optional attachment (attached to environmental case with 6-core custom USB-C cable!) 
 - Knowles Winfrey Microphone with Differential Amplifier -> Inverting Amplifier Cascade for audio (giving single-ended-equivalent gains minimum 220+!)

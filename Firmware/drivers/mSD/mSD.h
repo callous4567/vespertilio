@@ -5,6 +5,7 @@
 #include "ff.h"
 #include "pico/stdlib.h"
 #include "hw_config.h"
+#include "../Utilities/universal_includes.h"
 
 // struct to contain all mSD variables applicable for us to use (that may change.) All malloc'd except for the sd_card_t object. 
 typedef struct {

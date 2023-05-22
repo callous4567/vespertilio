@@ -24,10 +24,13 @@ typedef struct {
     // [0,5] the sensitivity 40-80-160-320-640-1280 milliseconds 
     int8_t sensint; 
 
+    // mutex inherited from the EXT_RTC used for sessions 
+    mutex_t* mutex; 
+
 } veml_t; // THIS IS MALLOC'D!!!
 
 // get the default VEML object initialized + configured up 
-veml_t* init_VEML_default(void);
+veml_t* init_VEML_default(mutex_t* EXT_RTC_MUTEX);
 
 // configure the provided VEML with the integration time (decimal 0 through 5, 40-80-160-320-640-1280 milliseconds.)
 void veml_default_configuration_write(veml_t* VEML);

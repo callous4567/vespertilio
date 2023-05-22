@@ -14,6 +14,7 @@ specific language governing permissions and limitations under the License.
 #include <stdio.h>
 #include <stdarg.h>
 #include "my_debug.h"
+#include "../../flashlog/flashlog.h"
 
 void my_printf(const char *pcFormat, ...) {
     char pcBuffer[256] = {0};
@@ -21,7 +22,14 @@ void my_printf(const char *pcFormat, ...) {
     va_start(xArgs, pcFormat);
     vsnprintf(pcBuffer, sizeof(pcBuffer), pcFormat, xArgs);
     va_end(xArgs);
-    printf("%s", pcBuffer);
+    if (USE_FLASHLOG) {
+        flashprintf(
+            "%s",
+            pcBuffer
+        );
+    } else {
+        printf("%s", pcBuffer);
+    }
     fflush(stdout);
 }
 

@@ -1,4 +1,4 @@
-#include "../pinout.h"
+#include "v6.h"
 
 // PCB version 
 const int32_t PCB_VER = 6;

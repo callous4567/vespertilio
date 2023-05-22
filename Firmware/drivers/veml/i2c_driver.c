@@ -13,6 +13,7 @@ That ensures it's turned off (since by default, it's on- deinit/free(VEML) will 
 */
 static const int32_t VEML_STRINGSIZE = 29; // 4*5 byte char, four spacers (4*2), then one sens char, makes 29. 
 static const int32_t VEML_DEFAULT_SENSITIVITY = 0; // 40 ms (40,80,160,320,640,1280 0,1,2,3,4,5.) Mathematically, the conversion is 40 milliseconds * 2^(sensitivity) 
+static const int32_t VEML_MUTEX_TIMOUT_MS = 1000; // mutex timeout in ms 
 
 // write a single data byte (16 bit) to the VEML at the given command register
 static void veml_write(veml_t* VEML, uint8_t command, uint16_t data_byte) {
@@ -21,7 +22,9 @@ static void veml_write(veml_t* VEML, uint8_t command, uint16_t data_byte) {
     *(buffer) = command;
     *(buffer+1) = (uint8_t)(data_byte);
     *(buffer+2) = (uint8_t)(data_byte >> 8);
+    mutex_enter_timeout_ms(VEML->mutex, VEML_MUTEX_TIMOUT_MS);
     i2c_write_blocking(VEML->hw_inst, VEML_SLAVE, buffer, 3, false);
+    mutex_exit(VEML->mutex);
     free(buffer);
 
 }
@@ -30,8 +33,10 @@ static void veml_write(veml_t* VEML, uint8_t command, uint16_t data_byte) {
 static void veml_read(veml_t* VEML, uint8_t command, uint16_t* read_value) {
 
     uint8_t* valtemp = (uint8_t*)malloc(2);
+    mutex_enter_timeout_ms(VEML->mutex, VEML_MUTEX_TIMOUT_MS);
     i2c_write_blocking(VEML->hw_inst, VEML_SLAVE, &command, 1, true);
     i2c_read_blocking(VEML->hw_inst, VEML_SLAVE, valtemp, 2, false);
+    mutex_exit(VEML->mutex);
     uint16_t lower = *valtemp;
     uint16_t upper = *(valtemp+1);
     *read_value = (upper << 8) | lower;
@@ -63,7 +68,7 @@ static inline int16_t sens_period(int8_t sensint) {
 
 // convenience- sleep two periods of recording 
 static inline void sens_sleep(veml_t* VEML) {
-    busy_wait_ms(2*sens_period(VEML->sensint));
+    sleep_ms(2*sens_period(VEML->sensint));
 }
 
 /* quickly step up/down the VEML sensitivity based on the current value of sensitivity. */
@@ -87,13 +92,13 @@ static void veml_sens_step_startup(veml_t* VEML) {
         veml_sens_step(VEML); // step based on current value 
         veml_read_rgbw_raw(VEML); // poll VEML
         sens_sleep(VEML); // sleep and repeat 
-        printf("Current VEML %d\r\n", VEML->sensint);
+        custom_printf("Current VEML %d\r\n", VEML->sensint);
     }
 
 }
 
-// generate a default VEML (this includes the step of calibrating sensitivity.) 
-veml_t* init_VEML_default(void) {
+// generate a default VEML (this includes the step of calibrating sensitivity.) Requires the input of an appropriate mutex (inherited from the EXT_RTC mutex, i.e)
+veml_t* init_VEML_default(mutex_t* EXT_RTC_MUTEX) {
 
     // set up the object (VEML->sensint is set by veml_config_write automatically.)
     veml_t* VEML = (veml_t*)malloc(sizeof(veml_t));
@@ -101,6 +106,7 @@ veml_t* init_VEML_default(void) {
     VEML->scl = VEML_SCK_PIN;
     VEML->hw_inst = VEML_I2C;
     VEML->baudrate = VEML_BAUD;
+    VEML->mutex = EXT_RTC_MUTEX;
 
     /*
     // i2c setup (skip this here, as the RTC has the same init already done.)
@@ -138,7 +144,7 @@ void veml_read_rgbw(veml_t* VEML) {
     veml_sens_step(VEML); // step the sensitivity dependent on the current measurement (higher or lower if possible)
 }
 
-// free the VEML and all associated mallocs and shut it off using config 
+// free the VEML and all associated mallocs and shut it off using config. Do this after the RTC has been disabled/freed. 
 void veml_free(veml_t* VEML) {
 
     veml_write(VEML, VEML_CONF, (uint16_t)0b0000000000000001);

@@ -1,0 +1,2 @@
+## General description 
+Ver. 1 is compatible with all model(s) before Rev. 9 of the mainboard (which is switching to I2C communication rather than SPI.) Ver.2 (t.b.d) should be used with mainboard PCB versions Rev. 9 and above.

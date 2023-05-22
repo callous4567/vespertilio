@@ -5,6 +5,7 @@
 #include "ext_rtc_registers.h"
 #include "hardware/i2c.h"
 #include "hardware/rtc.h" 
+#include "pico/mutex.h"
 
 typedef struct {
 
@@ -25,17 +26,17 @@ typedef struct {
 
     // A string of the current time
     char* fullstring;
+    
+    /*
+    mutex all i2c operations. 
+    If flashlog exists, RTC inherits flashlog mutex. 
+    If not, RTC makes its own mutex in default init. 
+    VEML/BME280 inherit RTC mutex.
+    Note that the flashlog should always create the mutex first before calling ext_rtc initialization if used
+    */
+    mutex_t* mutex;
 
 } ext_rtc_t;
-
-// return the pointer to a malloc'd RTC default based on our config.
-// ext_rtc_t* init_RTC_default(void);
-
-// set the current time of the RTC from the internal timebuf 
-// void rtc_set_current_time(ext_rtc_t *EXT_RTC);
-
-// read the current time from the rtc to the internal timebuf 
-// void rtc_read_time(ext_rtc_t *EXT_RTC);
 
 void rtc_read_string_time(ext_rtc_t *EXT_RTC); 
 

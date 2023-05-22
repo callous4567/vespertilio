@@ -2,14 +2,7 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include <stdio.h>
-#include <stdbool.h>
-#include <string.h>
-#include <stdint.h>
-#include <malloc.h>
-#include "hardware/gpio.h"
-#include "hardware/timer.h"
-
+#include "universal_includes.h"
 
 // Enable digital assembly or analogue assembly (and disable too)
 void digi_enable(void); 
@@ -35,7 +28,5 @@ uint8_t* pack_int32_uint8(int32_t* buf, int32_t len);
 
 
 int32_t* pack_uint8_int32(uint8_t* buf, int32_t len);
-
-
 
 #endif /* IS62_SRAM_H */

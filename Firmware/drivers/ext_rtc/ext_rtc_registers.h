@@ -6,7 +6,7 @@
 // Note the presence of the interrupt pin for this particular RTC
 extern const int RTC_BAUD;
 
-// And the i2c 
+// And the i2c, defined inside pinout.h
 extern i2c_inst_t* RTC_I2C;
 
 // The slave address for I2C, equal to (0b1=Read,0b0=Write)|(0b1101000=Slave)

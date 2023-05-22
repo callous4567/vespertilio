@@ -1,0 +1,21 @@
+; This program will follow the MCP33151D datasheet in obtaining results from the ADC in 16-bit form.
+; Results are pushed to the outgoing PIO FIFO and this program will run continuously as this occurs.
+; Note that an external CNVST signal must be provided to the MCP33151D: we do not do that here.
+
+.program record
+.side_set 1; one side-set pin- the side-set pin is a secondary pin controlled by the pio
+
+    pull      side 0 ; Data is shifted in on the falling edge 
+    set x, 15 side 0 ; x is a bit counter for the PIO to loop over (16-bit values, 0-based)
+
+wait 0 pin 0 ; wait for pin 0 to go to logic low (CNVST goes low)
+
+obtloop:
+
+    in pins, side 0 ; Data is shifted in on the falling edge
+    nop      side 1 ; Do nothing for the upper 
+    jmp x-- obtloop ; jump back to obtloop and decrement x on each pass (16 bits)
+
+push Block ; Push the block to the FIFO (32 bits though- not 16. We will need to be a bit innovative in generating the pointers.)
+
+.wrap 

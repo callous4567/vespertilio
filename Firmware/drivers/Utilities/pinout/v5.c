@@ -1,6 +1,6 @@
-#include "../pinout.h"
+#include "v5.h"
 
-// PCB version 
+// PCB version
 const int32_t PCB_VER = 5;
 
 // ADC pin 

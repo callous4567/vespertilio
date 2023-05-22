@@ -1,14 +1,16 @@
 // Header Guard
-#ifndef VTILIO_USB
-#define VTILIO_USB
+#ifndef VTIUSB
+#define VTIUSB
 
-#include <stdbool.h>
-#include <stdint.h>
+#include "../Utilities/universal_includes.h"
 
 const extern int32_t CONFIGURATION_BUFFER_INDEPENDENT_VALUES; // for external_config.c
 
-int usb_configurate(void);
+int8_t main_USB(void);
+
+int32_t usb_configurate(void);
 
 int32_t* read_from_flash(void);
 
-#endif // VTILIO_USB
+void write_default_test_configuration(void); 
+#endif // VTIUSB

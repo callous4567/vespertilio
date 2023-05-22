@@ -23,6 +23,9 @@ specific language governing permissions and limitations under the License.
 #include "spi.h"
 //
 #include "hardware/adc.h"
+#include "hardware/dma.h"
+
+#include "../../Utilities/external_config.h"
 
 static bool irqChannel1 = false;
 static bool irqShared = true;
@@ -53,7 +56,11 @@ void set_spi_dma_irq_channel(bool useChannel1, bool shared) {
 //   If the data that will be transmitted is not important,
 //     pass NULL as tx and then the SPI_FILL_CHAR is sent out as each data
 //     element.
-bool spi_transfer(spi_t *pSPI, const uint8_t *tx, uint8_t *rx, size_t length) {
+bool spi_transfer(
+    spi_t *pSPI, 
+    const uint8_t *tx, 
+    uint8_t *rx, 
+    size_t length) {
     // myASSERT(512 == length || 1 == length);
     myASSERT(tx || rx);
     // myASSERT(!(tx && rx));
@@ -116,6 +123,190 @@ bool spi_transfer(spi_t *pSPI, const uint8_t *tx, uint8_t *rx, size_t length) {
 
 }
 
+// With DMA sniffy sniff
+bool crc_spi_transfer(
+    spi_t *pSPI, 
+    const uint8_t *tx,
+    uint8_t *rx, 
+    uint16_t *crc, 
+    size_t length) {
+
+    myASSERT(tx || rx);
+
+    // tx write increment is already false
+    if (tx) {
+        channel_config_set_read_increment(&pSPI->tx_dma_cfg, true);
+        // Enable the sniffer
+        dma_sniffer_enable(
+            pSPI->tx_dma,
+            0x02,
+            true
+        );
+        channel_config_set_sniff_enable(
+            &pSPI->tx_dma_cfg,
+            true
+        );
+        dma_hw->sniff_data = 0;
+    } else { // NULL=FALSE
+        static const uint8_t dummy = SPI_FILL_CHAR;
+        tx = &dummy;
+        channel_config_set_read_increment(&pSPI->tx_dma_cfg, false);
+    }
+
+
+    // rx read increment is already false
+    if (rx) {
+        // Enable the sniffer
+        dma_sniffer_enable(
+            pSPI->rx_dma,
+            0x02,
+            true
+        );
+        channel_config_set_sniff_enable(
+            &pSPI->rx_dma_cfg,
+            true
+        );
+        dma_hw->sniff_data = 0;
+        channel_config_set_write_increment(&pSPI->rx_dma_cfg, true);
+    } else {
+        static uint8_t dummy = 0xA5;
+        rx = &dummy;
+        channel_config_set_write_increment(&pSPI->rx_dma_cfg, false);
+    }
+
+    // Clear the interrupt request.
+    dma_hw->ints0 = 1u << pSPI->rx_dma;
+
+    // Launch tx
+    dma_channel_configure(pSPI->tx_dma, &pSPI->tx_dma_cfg,
+                        &spi_get_hw(pSPI->hw_inst)->dr,  // write address
+                        tx,                              // read address
+                        length,  // element count (each element is of
+                                // size transfer_data_size)
+                        false);  // start
+    dma_channel_configure(pSPI->rx_dma, &pSPI->rx_dma_cfg,
+                        rx,                              // write address
+                        &spi_get_hw(pSPI->hw_inst)->dr,  // read address
+                        length,  // element count (each element is of
+                                // size transfer_data_size)
+                        false);  // start
+
+    // start them exactly simultaneously to avoid races (in extreme cases
+    // the FIFO could overflow)
+    dma_start_channel_mask((1u << pSPI->tx_dma) | (1u << pSPI->rx_dma));
+
+    // sleep appropriate time 
+    sleep_us(INTERBLOCK_SLEEP_TIME_US);
+
+    /* Timeout 1 sec */
+    uint32_t timeOut = 1000;
+    /* Wait until master completes transfer or time out has occured. */
+    bool rc = sem_acquire_timeout_ms(
+        &pSPI->sem, timeOut);  // Wait for notification from ISR
+    if (!rc) {
+        // If the timeout is reached the function will return false
+        DBG_PRINTF("Notification wait timed out in %s\n", __FUNCTION__);
+        return false;
+    }
+
+    // Shouldn't be necessary:
+    dma_channel_wait_for_finish_blocking(pSPI->tx_dma);
+    dma_channel_wait_for_finish_blocking(pSPI->rx_dma);
+
+    myASSERT(!dma_channel_is_busy(pSPI->tx_dma));
+    myASSERT(!dma_channel_is_busy(pSPI->rx_dma));
+
+    // Get CRC
+    *crc = dma_hw->sniff_data;
+
+    return true;
+
+}
+
+// With DMA sniffy sniff, specifically from the ADC. Will automatically chain to & write the CRC.
+bool adc_crc_spi_transfer(
+    spi_t *pSPI,
+    uint16_t* crc) {
+
+    // rx configuration
+    static uint8_t dummy = 0XA5;
+    uint8_t* rx = &dummy;
+    channel_config_set_write_increment(&pSPI->rx_dma_cfg, false);
+
+    // set the read increment to false, since it's going from the ADC 
+    channel_config_set_read_increment(&pSPI->tx_dma_cfg, false);
+    channel_config_set_write_increment(&pSPI->tx_dma_cfg, false);
+
+    // Set the dreq
+    channel_config_set_dreq(&pSPI->tx_dma_cfg, DREQ_ADC);
+    channel_config_set_dreq(&pSPI->rx_dma_cfg, DREQ_ADC);
+
+    // Enable the sniffer
+    dma_sniffer_enable(
+        pSPI->tx_dma,
+        0x02,
+        true
+    );
+    channel_config_set_sniff_enable(
+        &pSPI->tx_dma_cfg,
+        true
+    );
+    dma_hw->sniff_data = 0;
+
+    // Clear the interrupt request.
+    dma_hw->ints0 = 1u << pSPI->rx_dma;
+
+    // Launch tx
+    dma_channel_configure(pSPI->tx_dma, &pSPI->tx_dma_cfg,
+                        &spi_get_hw(pSPI->hw_inst)->dr,  // write address
+                        &adc_hw->fifo,                              // read address
+                        512,  // element count 
+                        false);  // start
+    dma_channel_configure(pSPI->rx_dma, &pSPI->rx_dma_cfg,
+                        rx,                              // write address
+                        &spi_get_hw(pSPI->hw_inst)->dr,  // read address
+                        512,  // element count 
+                        false);  // start
+
+    // start them exactly simultaneously to avoid races (in extreme cases
+    // the FIFO could overflow)
+    dma_start_channel_mask((1u << pSPI->tx_dma) | (1u << pSPI->rx_dma));
+
+    // sleep appropriate time 
+    //sleep_us(0.8*BLOCK_SAMPLE_TIME_US);
+
+    /* Timeout 1 sec */
+    uint32_t timeOut = 1000;
+    /* Wait until master completes transfer or time out has occured. */
+    bool rc = sem_acquire_timeout_ms(
+        &pSPI->sem, timeOut);  // Wait for notification from ISR
+    if (!rc) {
+        // If the timeout is reached the function will return false
+        DBG_PRINTF("Notification wait timed out in %s\n", __FUNCTION__);
+        return false;
+    }
+
+    // Shouldn't be necessary:
+    dma_channel_wait_for_finish_blocking(pSPI->tx_dma);
+    dma_channel_wait_for_finish_blocking(pSPI->rx_dma);
+    myASSERT(!dma_channel_is_busy(pSPI->tx_dma));
+    myASSERT(!dma_channel_is_busy(pSPI->rx_dma));
+
+    // proceed to write the CRC value, too 
+    *crc = dma_hw->sniff_data;
+
+    // Reset the dreq to the spi_init configuration.
+    channel_config_set_dreq(&pSPI->tx_dma_cfg, spi_get_index(pSPI->hw_inst)
+                                                    ? DREQ_SPI1_TX
+                                                    : DREQ_SPI0_TX);
+    channel_config_set_dreq(&pSPI->rx_dma_cfg, spi_get_index(pSPI->hw_inst)
+                                                    ? DREQ_SPI1_RX
+                                                    : DREQ_SPI0_RX);
+
+    return true;
+
+}
+
 void spi_lock(spi_t *pSPI) {
     myASSERT(mutex_is_initialized(&pSPI->mutex));
     mutex_enter_blocking(&pSPI->mutex);
@@ -162,7 +353,7 @@ bool my_spi_init(spi_t *pSPI) {
             gpio_set_drive_strength(pSPI->sck_gpio, pSPI->sck_gpio_drive_strength);
         }
 
-        // SD cards' DO MUST be pulled up.
+        // SD cards' DO MUST be pulled up (we already have pullups so this is not necessary)
         gpio_pull_up(pSPI->miso_gpio);
 
         // Grab some unused dma channels

@@ -53,6 +53,8 @@ static const char m_Crc7Table[] = {0x00, 0x09, 0x12, 0x1B, 0x24, 0x2D, 0x36,
 	0x44, 0x7B, 0x72, 0x69, 0x60, 0x0E, 0x07, 0x1C, 0x15, 0x2A, 0x23, 0x38,
 	0x31, 0x46, 0x4F, 0x54, 0x5D, 0x62, 0x6B, 0x70, 0x79};
 
+// crc16_ccitt_table https://github.com/boundary/wireshark/blob/master/wsutil/crc16.c standard CRC that DMA can calculate 
+// /* Same as above, only without reverse (Reverse=FALSE) */
 static const unsigned short m_Crc16Table[256] = {0x0000, 0x1021, 0x2042,
 	0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7, 0x8108, 0x9129, 0xA14A, 0xB16B,
 	0xC18C, 0xD1AD, 0xE1CE, 0xF1EF, 0x1231, 0x0210, 0x3273, 0x2252, 0x52B5,
@@ -96,6 +98,12 @@ char crc7(const char* data, int length)
 	return crc;
 }
 
+// calculate the crc16 checksum for provided data/length. 
+// See https://github.com/CANopenNode/CANopenNode/blob/master/301/crc16-ccitt.c to understand the ccitt_table + the actual ccitt formula
+// This CRC16 can be automatically done by the Pi Pico DMA- see the RP2040 hardware_dma/DMA datasheet + SDK sniffer section
+// This function is identical to the one used in https://github.com/CANopenNode/CANopenNode/blob/master/301/crc16-ccitt.c 
+// So, CRC16_CCITT will return us the correct CRC16 checksum- the DMA can automatically calculate this for us 
+// 
 unsigned short crc16(const char* data, int length)
 {
 	//Calculate the CRC16 checksum for the specified data block
